@@ -1,0 +1,6715 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="在浏览器中把视频或多张图片转换为 GIF。支持裁剪、排序、帧率、停留时长、尺寸、颜色和循环设置，全部在本地完成。">
+  <title>帧间 Framegrab · 视频 / 图片转 GIF</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23181a15'/%3E%3Cpath d='M25 20v24l19-12z' fill='%23ff5b36'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --paper: #f2eee4;
+      --paper-deep: #e8e1d2;
+      --card: #fbf8f1;
+      --ink: #181a15;
+      --ink-soft: #5f6056;
+      --muted: #706f65;
+      --line: rgba(24, 26, 21, 0.14);
+      --line-strong: rgba(24, 26, 21, 0.27);
+      --accent: #ff5b36;
+      --accent-deep: #e5411e;
+      --lime: #d8fb68;
+      --dark: #171914;
+      --dark-soft: #20231c;
+      --cream: #f5f1e6;
+      --dark-line: rgba(245, 241, 230, 0.14);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --shadow: 0 28px 70px -46px rgba(23, 25, 20, 0.62);
+      --font-sans: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      --font-serif: "Iowan Old Style", "Baskerville", "Songti SC", "STSong", "Noto Serif CJK SC", "SimSun", serif;
+      --font-mono: "SFMono-Regular", "Cascadia Mono", "Consolas", "Liberation Mono", monospace;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-width: 300px;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body::selection,
+    ::selection {
+      color: var(--ink);
+      background: var(--lime);
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    button,
+    input,
+    output {
+      font: inherit;
+    }
+
+    button,
+    a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    img,
+    video,
+    svg {
+      display: block;
+    }
+
+    p,
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 100;
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: var(--ink);
+      color: var(--cream);
+      font-size: 13px;
+      font-weight: 650;
+      text-decoration: none;
+      transform: translateY(-160%);
+      transition: transform 160ms ease;
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .paper-texture {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.32;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 76px 76px;
+      mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.45) 55%, transparent 92%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.45) 55%, transparent 92%);
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      width: min(1280px, calc(100% - 64px));
+      margin: 0 auto;
+    }
+
+    .site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 22px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--ink);
+      text-decoration: none;
+      border-radius: 12px;
+    }
+
+    .brand:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 5px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      flex: none;
+      filter: drop-shadow(0 8px 14px rgba(24, 26, 21, 0.16));
+    }
+
+    .brand-word {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 19px;
+      font-weight: 760;
+      letter-spacing: -0.045em;
+      line-height: 1;
+    }
+
+    .brand-word small {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .local-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 34px;
+      padding: 8px 13px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      background: rgba(251, 248, 241, 0.5);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .pulse-dot {
+      position: relative;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #4b8b2a;
+      box-shadow: 0 0 0 3px rgba(75, 139, 42, 0.13);
+    }
+
+    .pulse-dot::after {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      border: 1px solid rgba(75, 139, 42, 0.34);
+      border-radius: inherit;
+      animation: pulse 2.4s ease-out infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.8; transform: scale(0.55); }
+      65%, 100% { opacity: 0; transform: scale(1.4); }
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 184px;
+      align-items: center;
+      gap: 48px;
+      padding: 48px 0 38px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ink-soft);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow-line {
+      display: inline-block;
+      width: 24px;
+      height: 1px;
+      background: var(--ink);
+    }
+
+    .version {
+      padding: 2px 6px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      color: var(--muted);
+      font-size: 9px;
+      letter-spacing: 0.04em;
+    }
+
+    .hero h1 {
+      margin: 17px 0 20px;
+      font-size: clamp(3.25rem, 7.1vw, 5.9rem);
+      font-weight: 820;
+      letter-spacing: -0.065em;
+      line-height: 0.98;
+    }
+
+    .hero-accent {
+      display: block;
+      color: var(--accent);
+      font-family: var(--font-serif);
+      font-size: 0.98em;
+      font-weight: 600;
+      letter-spacing: -0.075em;
+    }
+
+    .hero-lede {
+      max-width: 570px;
+      color: var(--ink-soft);
+      font-size: 16px;
+      line-height: 1.8;
+    }
+
+    .hero-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 20px;
+      margin-top: 22px;
+    }
+
+    .hero-facts span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 550;
+    }
+
+    .hero-facts svg {
+      color: var(--accent-deep);
+    }
+
+    .hero-stamp {
+      position: relative;
+      display: flex;
+      width: 178px;
+      height: 178px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      justify-self: end;
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+      background: rgba(251, 248, 241, 0.35);
+      color: var(--ink);
+      text-align: center;
+      transform: rotate(7deg);
+    }
+
+    .hero-stamp::before,
+    .hero-stamp::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .hero-stamp::before {
+      inset: 9px;
+      border: 1px dashed var(--line-strong);
+    }
+
+    .hero-stamp::after {
+      top: 30px;
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+    }
+
+    .stamp-top,
+    .stamp-bottom {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+    }
+
+    .stamp-top {
+      margin-bottom: 3px;
+    }
+
+    .stamp-bottom {
+      margin-top: 5px;
+      color: var(--muted);
+    }
+
+    .hero-stamp strong {
+      font-family: var(--font-serif);
+      font-size: 49px;
+      font-weight: 500;
+      letter-spacing: -0.07em;
+      line-height: 1;
+    }
+
+    .hero-stamp strong span {
+      margin-left: 1px;
+      color: var(--accent);
+      font-family: var(--font-sans);
+      font-size: 18px;
+      font-weight: 750;
+      vertical-align: top;
+    }
+
+    .mode-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin: 2px 0 16px;
+    }
+
+    .mode-switch {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line-strong);
+      border-radius: 16px;
+      background: rgba(251, 248, 241, 0.68);
+      box-shadow: 0 14px 30px -30px rgba(24, 26, 21, 0.55);
+    }
+
+    .mode-tab {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px 8px 9px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--ink-soft);
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .mode-tab:hover {
+      color: var(--ink);
+      background: rgba(24, 26, 21, 0.045);
+    }
+
+    .mode-tab[aria-pressed="true"] {
+      background: var(--ink);
+      color: var(--cream);
+      box-shadow: 0 8px 18px -14px rgba(24, 26, 21, 0.7);
+    }
+
+    .mode-tab[aria-pressed="true"]:hover {
+      color: var(--cream);
+      background: var(--ink);
+    }
+
+    .mode-tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .mode-tab:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+
+    .mode-tab-icon {
+      display: grid;
+      width: 31px;
+      height: 31px;
+      flex: none;
+      place-items: center;
+      border-radius: 9px;
+      background: var(--paper-deep);
+      color: var(--ink);
+      transition: background-color 160ms ease, color 160ms ease;
+    }
+
+    .mode-tab-icon svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .mode-tab[aria-pressed="true"] .mode-tab-icon {
+      background: var(--accent);
+      color: var(--ink);
+    }
+
+    .mode-tab-copy strong {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.3;
+    }
+
+    .mode-tab-copy small {
+      display: block;
+      margin-top: 1px;
+      color: var(--muted);
+      font-size: 9px;
+      line-height: 1.3;
+    }
+
+    .mode-tab[aria-pressed="true"] .mode-tab-copy small {
+      color: rgba(245, 241, 230, 0.5);
+    }
+
+    .mode-bar-note {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.02em;
+    }
+
+    .mode-bar-note span {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .workbench {
+      display: grid;
+      grid-template-columns: minmax(0, 1.62fr) minmax(336px, 0.88fr);
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .card {
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+    }
+
+    .source-card {
+      min-width: 0;
+      padding: 26px;
+      background: var(--card);
+    }
+
+    .settings-card {
+      position: relative;
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 26px;
+      border-color: var(--dark);
+      background: var(--dark);
+      color: var(--cream);
+    }
+
+    .settings-card::before {
+      content: "";
+      position: absolute;
+      top: -160px;
+      right: -150px;
+      width: 360px;
+      height: 360px;
+      border: 1px solid rgba(216, 251, 104, 0.11);
+      border-radius: 50%;
+      pointer-events: none;
+      box-shadow:
+        0 0 0 38px rgba(216, 251, 104, 0.025),
+        0 0 0 78px rgba(216, 251, 104, 0.018);
+    }
+
+    .settings-card > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .heading-left {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+    }
+
+    .step-tag {
+      display: inline-grid;
+      min-width: 28px;
+      height: 23px;
+      place-items: center;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      color: var(--ink-soft);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .step-tag.light {
+      border-color: var(--dark-line);
+      color: rgba(245, 241, 230, 0.56);
+    }
+
+    .card-heading h2 {
+      font-size: 19px;
+      font-weight: 720;
+      letter-spacing: -0.035em;
+    }
+
+    .text-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 30px;
+      padding: 4px 2px;
+      border: 0;
+      border-bottom: 1px solid transparent;
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 150ms ease, border-color 150ms ease;
+    }
+
+    .text-button:hover:not(:disabled) {
+      color: var(--ink);
+      border-bottom-color: var(--ink);
+    }
+
+    .text-button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .text-button:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+
+    .text-button svg {
+      width: 13px;
+      height: 13px;
+    }
+
+    .local-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 7px;
+      border: 1px solid var(--dark-line);
+      border-radius: 6px;
+      color: rgba(245, 241, 230, 0.48);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+    }
+
+    .local-chip span {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--lime);
+    }
+
+    /* ---------- Import ---------- */
+
+    .dropzone {
+      position: relative;
+      display: flex;
+      min-height: 493px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 38px;
+      border: 1.5px dashed var(--line-strong);
+      border-radius: var(--radius-lg);
+      background:
+        radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.58), transparent 60%),
+        rgba(242, 238, 228, 0.52);
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+    }
+
+    .dropzone::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.55;
+      background-image: radial-gradient(var(--line) 0.7px, transparent 0.7px);
+      background-size: 10px 10px;
+      mask-image: radial-gradient(circle at center, #000, transparent 72%);
+      -webkit-mask-image: radial-gradient(circle at center, #000, transparent 72%);
+      pointer-events: none;
+    }
+
+    .dropzone > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .dropzone:hover,
+    .dropzone.is-dragover {
+      border-color: var(--accent);
+      background-color: #fff8ef;
+    }
+
+    .dropzone:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    .dropzone.is-dragover {
+      transform: scale(0.995);
+    }
+
+    .dropzone.is-loading {
+      cursor: progress;
+      border-style: solid;
+      border-color: var(--line);
+    }
+
+    .dropzone.is-loading .drop-art {
+      animation: soft-pulse 1.4s ease-in-out infinite;
+    }
+
+    @keyframes soft-pulse {
+      0%, 100% { opacity: 0.6; transform: translateY(0); }
+      50% { opacity: 1; transform: translateY(-3px); }
+    }
+
+    .drop-art {
+      position: relative;
+      width: 124px;
+      height: 98px;
+      margin-bottom: 27px;
+    }
+
+    .drop-frame {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      width: 94px;
+      height: 70px;
+      border: 1.5px solid var(--line-strong);
+      border-radius: 13px;
+      background: #f8f3e8;
+      box-shadow: 0 8px 22px -18px rgba(24, 26, 21, 0.4);
+    }
+
+    .drop-frame::after {
+      content: "";
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--line-strong);
+    }
+
+    .drop-frame:nth-child(1) {
+      transform: translate(-10px, 6px) rotate(-9deg);
+      background: var(--paper-deep);
+    }
+
+    .drop-frame:nth-child(2) {
+      transform: translate(10px, 3px) rotate(8deg);
+      background: #eee4d5;
+    }
+
+    .drop-frame:nth-child(3) {
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(246, 238, 224, 0.3)),
+        #f8f3e8;
+    }
+
+    .drop-play {
+      position: absolute;
+      top: 45px;
+      left: 63px;
+      display: grid;
+      width: 46px;
+      height: 46px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--ink);
+      box-shadow: 0 10px 23px -9px rgba(255, 91, 54, 0.7);
+      transform: translate(-50%, -50%);
+    }
+
+    .drop-play svg {
+      margin-left: 2px;
+    }
+
+    .drop-art-images .photo-frame {
+      position: absolute;
+      width: 76px;
+      height: 58px;
+      overflow: hidden;
+      border: 1.5px solid var(--line-strong);
+      border-radius: 9px;
+      background: linear-gradient(155deg, #d8e6e1, #f7e2c5 55%, #e0b697);
+      box-shadow: 0 7px 17px -14px rgba(24, 26, 21, 0.55);
+    }
+
+    .drop-art-images .photo-frame::before {
+      content: "";
+      position: absolute;
+      top: 9px;
+      right: 11px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 250, 230, 0.86);
+      box-shadow: 0 0 0 3px rgba(255, 250, 230, 0.12);
+    }
+
+    .drop-art-images .photo-frame::after {
+      content: "";
+      position: absolute;
+      left: -5px;
+      right: -5px;
+      bottom: -1px;
+      height: 31px;
+      background: rgba(51, 91, 68, 0.72);
+      clip-path: polygon(0 100%, 0 69%, 22% 35%, 42% 72%, 62% 23%, 100% 78%, 100% 100%);
+    }
+
+    .photo-frame-one {
+      left: 5px;
+      top: 27px;
+      transform: rotate(-10deg);
+      filter: saturate(0.85);
+    }
+
+    .photo-frame-two {
+      left: 39px;
+      top: 8px;
+      transform: rotate(8deg);
+      background: linear-gradient(155deg, #f1d5c2, #d9a27a 52%, #6d7255) !important;
+    }
+
+    .photo-frame-three {
+      left: 24px;
+      top: 22px;
+      z-index: 3;
+      transform: rotate(-1deg);
+      background: linear-gradient(155deg, #c9d5dc, #e4bd92 48%, #817252) !important;
+    }
+
+    .image-add-badge {
+      position: absolute;
+      right: 1px;
+      bottom: 7px;
+      z-index: 5;
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border: 3px solid var(--card);
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--ink);
+      box-shadow: 0 8px 16px -9px rgba(181, 56, 27, 0.7);
+    }
+
+    .drop-copy h3 {
+      font-size: 22px;
+      font-weight: 730;
+      letter-spacing: -0.04em;
+    }
+
+    .drop-copy p {
+      margin-top: 7px;
+      color: var(--ink-soft);
+      font-size: 13px;
+    }
+
+    .pick-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 23px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: var(--ink);
+      color: var(--cream);
+      font-size: 12px;
+      font-weight: 620;
+      box-shadow: 0 12px 24px -15px rgba(24, 26, 21, 0.5);
+      transition: transform 180ms ease, background-color 180ms ease;
+    }
+
+    .dropzone:hover .pick-pill {
+      background: #2b2e25;
+      transform: translateY(-1px);
+    }
+
+    .pick-pill svg {
+      width: 13px;
+      height: 13px;
+      color: var(--lime);
+    }
+
+    .drop-foot {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 25px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.035em;
+    }
+
+    .drop-foot svg {
+      width: 11px;
+      height: 11px;
+    }
+
+    .drop-error {
+      max-width: 390px;
+      margin-top: 13px;
+      padding: 8px 11px;
+      border: 1px solid rgba(181, 47, 24, 0.24);
+      border-radius: 8px;
+      background: rgba(255, 91, 54, 0.08);
+      color: #a53018;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .drop-spinner {
+      width: 20px;
+      height: 20px;
+      margin-top: 22px;
+      border: 2px solid var(--line);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ---------- Editor ---------- */
+
+    .editor {
+      animation: fade-up 320ms ease both;
+    }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .file-strip {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: rgba(232, 225, 210, 0.34);
+    }
+
+    .file-icon {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      flex: none;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(251, 248, 241, 0.75);
+      color: var(--accent-deep);
+    }
+
+    .file-icon svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .file-details {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .file-name {
+      overflow: hidden;
+      font-size: 12.5px;
+      font-weight: 650;
+      line-height: 1.35;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-meta {
+      margin-top: 2px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.015em;
+      line-height: 1.4;
+    }
+
+    .video-viewport {
+      overflow: hidden;
+      border-radius: 16px;
+      background: #0e100d;
+      line-height: 0;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    .video-viewport video {
+      width: 100%;
+      max-height: 445px;
+      background: #0e100d;
+      object-fit: contain;
+    }
+
+    .trim-section {
+      margin-top: 22px;
+    }
+
+    .trim-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .trim-head h3 {
+      font-size: 15px;
+      font-weight: 710;
+      letter-spacing: -0.02em;
+    }
+
+    .trim-head p {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11.5px;
+    }
+
+    .trim-duration {
+      flex: none;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(251, 248, 241, 0.6);
+      color: var(--ink-soft);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .timeline {
+      position: relative;
+      height: 68px;
+      margin: 13px 9px 0;
+      border-radius: 11px;
+      cursor: crosshair;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .timeline.is-disabled {
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .filmstrip {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      overflow: hidden;
+      border-radius: 10px;
+      background:
+        linear-gradient(110deg, rgba(255, 255, 255, 0.03), transparent 50%),
+        #1b1d18;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    .film-thumb {
+      position: relative;
+      min-width: 0;
+      flex: 1;
+      background:
+        radial-gradient(circle at 35% 40%, rgba(216, 251, 104, 0.12), transparent 45%),
+        linear-gradient(145deg, #303329, #171914);
+      background-position: center;
+      background-size: cover;
+      opacity: 0;
+      transition: opacity 300ms ease;
+    }
+
+    .film-thumb + .film-thumb {
+      border-left: 1px solid rgba(255, 255, 255, 0.075);
+    }
+
+    .film-thumb.has-image {
+      opacity: 0.86;
+    }
+
+    .trim-shade {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      z-index: 2;
+      background: rgba(8, 9, 7, 0.67);
+      pointer-events: none;
+    }
+
+    .trim-shade-left {
+      left: 0;
+      width: 0;
+      border-radius: 10px 0 0 10px;
+    }
+
+    .trim-shade-right {
+      right: 0;
+      width: 100%;
+      border-radius: 0 10px 10px 0;
+    }
+
+    .trim-selection {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      z-index: 3;
+      border-top: 2px solid var(--accent);
+      border-bottom: 2px solid var(--accent);
+      pointer-events: none;
+      filter: drop-shadow(0 0 6px rgba(255, 91, 54, 0.18));
+    }
+
+    .trim-handle {
+      position: absolute;
+      top: -9px;
+      bottom: -9px;
+      left: 0;
+      z-index: 7;
+      display: flex;
+      width: 20px;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: ew-resize;
+      outline: none;
+      transform: translateX(-50%);
+      touch-action: none;
+    }
+
+    .trim-handle::before {
+      content: "";
+      width: 8px;
+      height: 42px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow:
+        0 0 0 3px var(--card),
+        0 7px 15px -6px rgba(24, 26, 21, 0.48);
+      transition: width 140ms ease, background-color 140ms ease;
+    }
+
+    .trim-handle::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 2px;
+      height: 13px;
+      border-radius: 2px;
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          rgba(24, 26, 21, 0.68) 0 2px,
+          transparent 2px 4px
+        );
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .trim-handle:hover::before {
+      width: 11px;
+    }
+
+    .trim-handle:focus-visible::before {
+      background: var(--lime);
+      box-shadow:
+        0 0 0 3px var(--card),
+        0 0 0 5px var(--accent),
+        0 7px 15px -6px rgba(24, 26, 21, 0.48);
+    }
+
+    .trim-handle.is-dragging::before {
+      width: 11px;
+      background: var(--lime);
+    }
+
+    .trim-handle-end {
+      left: 100%;
+    }
+
+    .playhead {
+      position: absolute;
+      top: -4px;
+      bottom: -4px;
+      left: 0;
+      z-index: 6;
+      width: 2px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.94);
+      pointer-events: none;
+      transform: translateX(-1px);
+      box-shadow: 0 0 0 1px rgba(24, 26, 21, 0.12);
+    }
+
+    .playhead::before {
+      content: "";
+      position: absolute;
+      top: -1px;
+      left: 50%;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #fff;
+      transform: translateX(-50%);
+    }
+
+    .time-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 16px;
+      margin-top: 13px;
+    }
+
+    .time-readout {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 10.5px;
+      white-space: nowrap;
+    }
+
+    .time-readout .dot {
+      width: 6px;
+      height: 6px;
+      margin-right: 1px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .time-readout.is-end .dot {
+      background: var(--ink);
+    }
+
+    .time-readout strong {
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.01em;
+    }
+
+    .mini-button {
+      min-height: 22px;
+      padding: 0 5px;
+      border: 0;
+      border-bottom: 1px solid var(--line-strong);
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: 9px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: color 130ms ease, border-color 130ms ease;
+    }
+
+    .mini-button:hover {
+      color: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .mini-button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .clip-total {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .clip-total strong {
+      margin-left: 4px;
+      color: var(--ink-soft);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .keyboard-hint {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 9.5px;
+    }
+
+    /* ---------- Image sequence ---------- */
+
+    .image-preview-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .image-preview-title {
+      min-width: 0;
+    }
+
+    .image-preview-name {
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 650;
+      line-height: 1.35;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .image-preview-detail {
+      margin-top: 2px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      line-height: 1.4;
+    }
+
+    .sequence-play-btn {
+      display: inline-flex;
+      min-height: 34px;
+      align-items: center;
+      gap: 7px;
+      flex: none;
+      padding: 8px 11px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(242, 238, 228, 0.72);
+      color: var(--ink-soft);
+      font-size: 10px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+    }
+
+    .sequence-play-btn:hover:not(:disabled) {
+      border-color: var(--line-strong);
+      background: #f7f0e4;
+      color: var(--ink);
+    }
+
+    .sequence-play-btn svg {
+      width: 13px;
+      height: 13px;
+      color: var(--accent-deep);
+    }
+
+    .sequence-play-btn[aria-pressed="true"] {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: var(--cream);
+    }
+
+    .sequence-play-btn[aria-pressed="true"] svg {
+      color: var(--lime);
+    }
+
+    .sequence-play-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .sequence-play-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .image-stage {
+      position: relative;
+      display: flex;
+      min-height: 376px;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 18px;
+      border: 1px solid rgba(245, 241, 230, 0.05);
+      border-radius: 17px;
+      background:
+        radial-gradient(circle at 50% 22%, rgba(216, 251, 104, 0.07), transparent 57%),
+        linear-gradient(140deg, #191b16, #0c0e0b 75%);
+    }
+
+    .image-stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.22;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.3) 0.6px, transparent 0.6px);
+      background-size: 12px 12px;
+      mask-image: radial-gradient(circle at center, transparent 20%, #000 85%);
+      -webkit-mask-image: radial-gradient(circle at center, transparent 20%, #000 85%);
+      pointer-events: none;
+    }
+
+    .image-canvas-preview {
+      position: relative;
+      z-index: 1;
+      width: 320px;
+      height: 180px;
+      flex: none;
+      overflow: hidden;
+      border-radius: 9px;
+      background: var(--image-bg, #11130f);
+      box-shadow:
+        0 24px 44px -30px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(255, 255, 255, 0.1);
+    }
+
+    .image-canvas-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .image-index-chip {
+      position: absolute;
+      left: 9px;
+      bottom: 9px;
+      z-index: 2;
+      padding: 4px 7px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 6px;
+      background: rgba(14, 16, 13, 0.74);
+      color: rgba(245, 241, 230, 0.88);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.035em;
+      backdrop-filter: blur(6px);
+    }
+
+    .image-canvas-note {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.01em;
+    }
+
+    .image-canvas-note span:last-child {
+      color: var(--ink-soft);
+      white-space: nowrap;
+    }
+
+    .image-sequence {
+      margin-top: 22px;
+    }
+
+    .image-seq-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: none;
+    }
+
+    .image-list {
+      display: flex;
+      align-items: stretch;
+      gap: 9px;
+      margin-top: 12px;
+      padding: 3px 2px 9px;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      scroll-snap-type: x proximity;
+      scrollbar-color: var(--line-strong) transparent;
+      scrollbar-width: thin;
+    }
+
+    .image-list::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .image-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .image-list::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      background: var(--line-strong);
+    }
+
+    .image-card {
+      position: relative;
+      width: 126px;
+      flex: none;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(251, 248, 241, 0.82);
+      scroll-snap-align: start;
+      transition: border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+    }
+
+    .image-card:hover {
+      border-color: var(--line-strong);
+    }
+
+    .image-card.is-selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent), 0 14px 25px -22px rgba(151, 46, 20, 0.62);
+    }
+
+    .image-card.is-dragging {
+      opacity: 0.36;
+    }
+
+    .image-card.is-drop-target::before {
+      content: "";
+      position: absolute;
+      top: 7px;
+      bottom: 7px;
+      left: -5px;
+      z-index: 4;
+      width: 2px;
+      border-radius: 2px;
+      background: var(--accent);
+    }
+
+    .image-select {
+      display: block;
+      width: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .image-select:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    .image-card-media {
+      position: relative;
+      display: block;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(216, 251, 104, 0.08), transparent 55%),
+        var(--paper-deep);
+    }
+
+    .image-card-media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 220ms ease;
+      -webkit-user-drag: none;
+    }
+
+    .image-card:hover .image-card-media img {
+      transform: scale(1.035);
+    }
+
+    .image-card-order {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      z-index: 2;
+      display: grid;
+      min-width: 23px;
+      height: 19px;
+      place-items: center;
+      padding: 0 5px;
+      border-radius: 5px;
+      background: rgba(23, 25, 20, 0.78);
+      color: var(--cream);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 650;
+      backdrop-filter: blur(4px);
+    }
+
+    .image-card-caption {
+      display: block;
+      overflow: hidden;
+      padding: 7px 8px 6px;
+      color: var(--ink-soft);
+      font-size: 9.5px;
+      font-weight: 600;
+      line-height: 1.3;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .image-card-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      border-top: 1px solid var(--line);
+    }
+
+    .image-card-actions button {
+      display: grid;
+      height: 27px;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      border-left: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background-color 130ms ease, color 130ms ease;
+    }
+
+    .image-card-actions button:first-child {
+      border-left: 0;
+    }
+
+    .image-card-actions button:hover:not(:disabled) {
+      background: rgba(24, 26, 21, 0.05);
+      color: var(--ink);
+    }
+
+    .image-card-actions button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    .image-card-actions button:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+    }
+
+    .image-card-actions svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .image-add-card {
+      display: flex;
+      width: 126px;
+      flex: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 15px 8px;
+      border: 1.5px dashed var(--line-strong);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 9px;
+      cursor: pointer;
+      scroll-snap-align: start;
+      transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+    }
+
+    .image-add-card .add-plus {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+      background: rgba(251, 248, 241, 0.7);
+      color: var(--ink-soft);
+      font-size: 18px;
+      font-weight: 300;
+      line-height: 1;
+    }
+
+    .image-add-card:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: #fff8ef;
+      color: var(--ink);
+    }
+
+    .image-add-card:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .image-add-card:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .image-editor.is-importing .image-card-actions,
+    .image-editor.is-importing .image-select,
+    .image-editor.is-importing .image-add-card,
+    .image-editor.is-importing .sequence-play-btn {
+      pointer-events: none;
+      opacity: 0.55;
+    }
+
+    .is-busy .image-card-actions,
+    .is-busy .image-select,
+    .is-busy .image-add-card,
+    .is-busy .sequence-play-btn {
+      pointer-events: none;
+      opacity: 0.55;
+    }
+
+    /* ---------- Settings ---------- */
+
+    .settings-card fieldset {
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      transition: opacity 220ms ease;
+    }
+
+    .settings-card fieldset:disabled {
+      opacity: 0.56;
+    }
+
+    .setting-block {
+      padding: 18px 0;
+      border-top: 1px solid var(--dark-line);
+    }
+
+    .setting-block:first-of-type {
+      padding-top: 2px;
+      border-top: 0;
+    }
+
+    .field-label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .field-title {
+      color: rgba(245, 241, 230, 0.9);
+      font-size: 12.5px;
+      font-weight: 620;
+      letter-spacing: -0.01em;
+    }
+
+    .field-label > span:last-child,
+    .field-label output {
+      color: rgba(245, 241, 230, 0.48);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+
+    .field-label output {
+      letter-spacing: 0.01em;
+    }
+
+    .segmented {
+      display: grid;
+      grid-auto-columns: 1fr;
+      grid-auto-flow: column;
+      gap: 3px;
+      padding: 4px;
+      border: 1px solid var(--dark-line);
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .segmented button {
+      min-width: 0;
+      min-height: 34px;
+      padding: 7px 4px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: rgba(245, 241, 230, 0.46);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+
+    .segmented button:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--cream);
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--lime);
+      color: var(--ink);
+      font-weight: 750;
+      box-shadow: 0 5px 12px -9px rgba(0, 0, 0, 0.8);
+    }
+
+    .segmented button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .segmented button small {
+      display: inline-block;
+      margin-left: 2px;
+      opacity: 0.55;
+      font-size: 8px;
+      font-weight: 550;
+    }
+
+    .range {
+      --range-p: 50%;
+      width: 100%;
+      height: 22px;
+      margin: 4px 0 7px;
+      padding: 0;
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .range:focus-visible {
+      outline: none;
+    }
+
+    .range::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        var(--lime) 0 var(--range-p),
+        rgba(255, 255, 255, 0.14) var(--range-p) 100%
+      );
+    }
+
+    .range::-webkit-slider-thumb {
+      width: 17px;
+      height: 17px;
+      margin-top: -6.5px;
+      border: 3px solid var(--dark);
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 0 1px var(--lime), 0 4px 10px rgba(0, 0, 0, 0.3);
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .range:focus-visible::-webkit-slider-thumb {
+      box-shadow: 0 0 0 2px var(--dark), 0 0 0 4px var(--accent);
+    }
+
+    .range::-moz-range-track {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .range::-moz-range-progress {
+      height: 4px;
+      border-radius: 999px;
+      background: var(--lime);
+    }
+
+    .range::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border: 3px solid var(--dark);
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 0 1px var(--lime);
+    }
+
+    .range:focus-visible::-moz-range-thumb {
+      box-shadow: 0 0 0 2px var(--dark), 0 0 0 4px var(--accent);
+    }
+
+    .field-note {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: rgba(245, 241, 230, 0.46);
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.01em;
+    }
+
+    .field-note span:last-child {
+      color: rgba(245, 241, 230, 0.57);
+      white-space: nowrap;
+    }
+
+    .fit-color-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 14px;
+      padding-top: 13px;
+      border-top: 1px solid var(--dark-line);
+    }
+
+    .fit-color-copy {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .fit-color-title {
+      color: rgba(245, 241, 230, 0.82);
+      font-size: 10.5px;
+      font-weight: 600;
+    }
+
+    .fit-color-copy small {
+      color: rgba(245, 241, 230, 0.4);
+      font-size: 9px;
+      line-height: 1.4;
+    }
+
+    .color-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: none;
+      cursor: pointer;
+    }
+
+    .color-control > span {
+      color: rgba(245, 241, 230, 0.46);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.02em;
+    }
+
+    .color-control input[type="color"] {
+      width: 32px;
+      height: 26px;
+      padding: 2px;
+      border: 1px solid var(--dark-line);
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .color-control input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .color-control input[type="color"]::-webkit-color-swatch {
+      border: 0;
+      border-radius: 4px;
+    }
+
+    .color-control input[type="color"]::-moz-color-swatch {
+      border: 0;
+      border-radius: 4px;
+    }
+
+    .color-control input[type="color"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .toggle-block {
+      padding: 1px 0;
+      border-top: 1px solid var(--dark-line);
+    }
+
+    .toggle-row {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 13px 0;
+      cursor: pointer;
+    }
+
+    .toggle-row + .toggle-row {
+      border-top: 1px solid rgba(245, 241, 230, 0.08);
+    }
+
+    .toggle-copy {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .toggle-copy strong {
+      color: rgba(245, 241, 230, 0.9);
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+
+    .toggle-copy small {
+      color: rgba(245, 241, 230, 0.48);
+      font-size: 9.5px;
+      line-height: 1.45;
+    }
+
+    .toggle-row input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .switch-track {
+      position: relative;
+      width: 40px;
+      height: 23px;
+      flex: none;
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.1);
+      transition: background-color 160ms ease, border-color 160ms ease;
+    }
+
+    .switch-track::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      background: rgba(245, 241, 230, 0.6);
+      transition: transform 160ms ease, background-color 160ms ease;
+    }
+
+    .toggle-row input:checked + .switch-track {
+      border-color: var(--lime);
+      background: var(--lime);
+    }
+
+    .toggle-row input:checked + .switch-track::after {
+      background: var(--ink);
+      transform: translateX(17px);
+    }
+
+    .toggle-row input:focus-visible + .switch-track {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .estimate-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-top: 19px;
+      padding: 13px 14px;
+      border: 1px solid var(--dark-line);
+      border-radius: 12px;
+      background:
+        linear-gradient(105deg, rgba(216, 251, 104, 0.04), transparent 55%),
+        rgba(255, 255, 255, 0.025);
+    }
+
+    .estimate-box > div + div {
+      padding-left: 14px;
+      border-left: 1px solid var(--dark-line);
+    }
+
+    .estimate-box span {
+      display: block;
+      color: rgba(245, 241, 230, 0.48);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+
+    .estimate-box strong {
+      display: block;
+      margin-top: 3px;
+      color: var(--cream);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .limit-hint,
+    .settings-error {
+      margin-top: 9px;
+      color: #ffb8a7;
+      font-size: 10px;
+      line-height: 1.55;
+    }
+
+    .settings-error {
+      margin-top: 10px;
+      text-align: center;
+    }
+
+    .action-area {
+      margin-top: auto;
+      padding-top: 22px;
+    }
+
+    .generate-btn {
+      display: flex;
+      width: 100%;
+      min-height: 56px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 8px 9px 8px 20px;
+      border: 1px solid var(--accent);
+      border-radius: 15px;
+      background: var(--accent);
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 750;
+      letter-spacing: -0.015em;
+      cursor: pointer;
+      box-shadow: 0 16px 28px -24px rgba(255, 91, 54, 0.9);
+      transition: background-color 150ms ease, transform 150ms ease, opacity 150ms ease;
+    }
+
+    .generate-btn:hover:not(:disabled) {
+      background: #ff6a48;
+      transform: translateY(-1px);
+    }
+
+    .generate-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .generate-btn:focus-visible {
+      outline: 2px solid var(--cream);
+      outline-offset: 3px;
+    }
+
+    .generate-btn:disabled {
+      opacity: 0.28;
+      cursor: not-allowed;
+    }
+
+    .generate-btn .btn-icon {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      flex: none;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--ink);
+      color: var(--cream);
+      transition: transform 150ms ease;
+    }
+
+    .generate-btn:hover:not(:disabled) .btn-icon {
+      transform: rotate(45deg);
+    }
+
+    .trust-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 11px;
+      color: rgba(245, 241, 230, 0.42);
+      font-size: 8.5px;
+      text-align: center;
+    }
+
+    .trust-note svg {
+      width: 10px;
+      height: 10px;
+    }
+
+    .progress-panel {
+      padding: 15px;
+      border: 1px solid var(--dark-line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .progress-copy {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      color: rgba(245, 241, 230, 0.78);
+      font-size: 10.5px;
+    }
+
+    .progress-copy span:first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .progress-copy span:last-child {
+      flex: none;
+      color: var(--lime);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .progress-track {
+      height: 7px;
+      margin: 11px 0 10px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.09);
+    }
+
+    .progress-bar {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--lime);
+      transition: width 180ms ease;
+    }
+
+    .progress-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: rgba(245, 241, 230, 0.46);
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+    }
+
+    .cancel-button {
+      padding: 2px 0;
+      border: 0;
+      border-bottom: 1px solid rgba(245, 241, 230, 0.32);
+      background: transparent;
+      color: rgba(245, 241, 230, 0.62);
+      font-family: var(--font-sans);
+      font-size: 9px;
+      cursor: pointer;
+    }
+
+    .cancel-button:hover {
+      color: var(--cream);
+    }
+
+    .cancel-button:disabled {
+      opacity: 0.45;
+      cursor: wait;
+    }
+
+    .cancel-button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* ---------- Result ---------- */
+
+    .result-card {
+      position: relative;
+      display: grid;
+      overflow: hidden;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 38px;
+      align-items: center;
+      margin-top: 20px;
+      padding: 32px;
+      border: 1px solid var(--accent-deep);
+      border-radius: var(--radius-xl);
+      background: var(--accent);
+      color: var(--ink);
+      box-shadow: 0 28px 65px -42px rgba(157, 52, 27, 0.72);
+      animation: result-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    @keyframes result-in {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-card::before {
+      content: "GIF";
+      position: absolute;
+      right: 1%;
+      bottom: -15%;
+      color: rgba(24, 26, 21, 0.055);
+      font-family: var(--font-sans);
+      font-size: clamp(14rem, 28vw, 26rem);
+      font-weight: 850;
+      letter-spacing: -0.1em;
+      line-height: 0.8;
+      pointer-events: none;
+    }
+
+    .result-card::after {
+      content: "";
+      position: absolute;
+      top: -150px;
+      left: 34%;
+      width: 330px;
+      height: 330px;
+      border: 1px solid rgba(24, 26, 21, 0.13);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .result-copy,
+    .result-stage {
+      position: relative;
+      z-index: 1;
+    }
+
+    .result-kicker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+
+    .result-kicker .result-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ink);
+      box-shadow: 0 0 0 3px rgba(24, 26, 21, 0.12);
+    }
+
+    .result-source {
+      margin-left: 2px;
+      padding: 2px 6px;
+      border: 1px solid rgba(24, 26, 21, 0.22);
+      border-radius: 4px;
+      color: rgba(24, 26, 21, 0.56);
+      font-size: 8px;
+      font-weight: 650;
+      letter-spacing: 0.08em;
+    }
+
+    .result-copy h2 {
+      margin: 15px 0 13px;
+      font-family: var(--font-serif);
+      font-size: clamp(2.5rem, 4.3vw, 4.05rem);
+      font-weight: 500;
+      letter-spacing: -0.075em;
+      line-height: 0.98;
+    }
+
+    .result-sub {
+      max-width: 330px;
+      color: rgba(24, 26, 21, 0.64);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .result-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 25px 0;
+      padding-top: 17px;
+      border-top: 1px solid rgba(24, 26, 21, 0.2);
+    }
+
+    .result-stats span {
+      display: block;
+      color: rgba(24, 26, 21, 0.52);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 650;
+      letter-spacing: 0.08em;
+    }
+
+    .result-stats strong {
+      display: block;
+      margin-top: 4px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .result-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 46px;
+      padding: 8px 15px 8px 18px;
+      border: 1px solid var(--ink);
+      border-radius: 12px;
+      background: var(--ink);
+      color: var(--cream);
+      font-size: 12px;
+      font-weight: 650;
+      text-decoration: none;
+      transition: background-color 150ms ease, transform 150ms ease;
+    }
+
+    .download-btn:hover {
+      background: #2a2d24;
+      transform: translateY(-1px);
+    }
+
+    .download-btn:focus-visible {
+      outline: 2px solid var(--cream);
+      outline-offset: 3px;
+    }
+
+    .download-btn svg {
+      width: 15px;
+      height: 15px;
+      color: var(--lime);
+    }
+
+    .ghost-btn {
+      min-height: 46px;
+      padding: 8px 16px;
+      border: 1px solid rgba(24, 26, 21, 0.32);
+      border-radius: 12px;
+      background: transparent;
+      color: rgba(24, 26, 21, 0.76);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 150ms ease, border-color 150ms ease;
+    }
+
+    .ghost-btn:hover {
+      border-color: rgba(24, 26, 21, 0.6);
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .ghost-btn:focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 3px;
+    }
+
+    .result-filename {
+      max-width: 100%;
+      margin-top: 12px;
+      overflow: hidden;
+      color: rgba(24, 26, 21, 0.46);
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .result-stage {
+      padding: 16px;
+      border-radius: 20px;
+      background: var(--dark);
+      box-shadow: 0 22px 46px -30px rgba(24, 26, 21, 0.72);
+    }
+
+    .result-frame {
+      display: flex;
+      min-height: 280px;
+      max-height: 410px;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 12px;
+      border-radius: 11px;
+      background-color: #ddd6c9;
+      background-image:
+        linear-gradient(45deg, rgba(24, 26, 21, 0.08) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(24, 26, 21, 0.08) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(24, 26, 21, 0.08) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(24, 26, 21, 0.08) 75%);
+      background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+      background-size: 18px 18px;
+    }
+
+    .result-frame img {
+      max-width: 100%;
+      max-height: 386px;
+      border-radius: 4px;
+      background: transparent;
+      box-shadow: 0 12px 24px -18px rgba(0, 0, 0, 0.48);
+    }
+
+    .stage-label {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding: 0 2px;
+      color: rgba(245, 241, 230, 0.32);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+
+    .stage-label span {
+      color: var(--lime);
+    }
+
+    /* ---------- Info & footer ---------- */
+
+    .info-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 30px;
+      margin: 38px 0 48px;
+    }
+
+    .info-item {
+      padding-top: 15px;
+      border-top: 1px solid var(--line-strong);
+    }
+
+    .info-item .info-index {
+      color: var(--accent-deep);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .info-item h3 {
+      margin-top: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .info-item p {
+      max-width: 330px;
+      margin-top: 5px;
+      color: var(--ink-soft);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .site-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 20px 0 30px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.025em;
+    }
+
+    .footer-brand {
+      color: var(--ink-soft);
+      font-family: var(--font-sans);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .footer-brand span {
+      margin-left: 5px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+    }
+
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 50;
+      max-width: min(360px, calc(100vw - 36px));
+      padding: 12px 16px;
+      border: 1px solid rgba(245, 241, 230, 0.13);
+      border-radius: 11px;
+      background: rgba(23, 25, 20, 0.96);
+      color: var(--cream);
+      font-size: 11.5px;
+      line-height: 1.55;
+      box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 180ms ease, transform 180ms ease;
+      backdrop-filter: blur(8px);
+    }
+
+    .toast.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.is-error {
+      border-color: rgba(255, 91, 54, 0.4);
+    }
+
+    .toast.is-error::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      vertical-align: 1px;
+    }
+
+    .noscript {
+      padding: 12px 20px;
+      background: var(--accent);
+      color: var(--ink);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .is-busy .dropzone,
+    .is-busy .timeline {
+      cursor: wait;
+    }
+
+    @media (max-width: 1080px) {
+      .page {
+        width: min(960px, calc(100% - 48px));
+      }
+
+      .hero {
+        grid-template-columns: minmax(0, 1fr) 152px;
+        gap: 30px;
+        padding-top: 40px;
+      }
+
+      .hero-stamp {
+        width: 148px;
+        height: 148px;
+      }
+
+      .hero-stamp strong {
+        font-size: 39px;
+      }
+
+      .stamp-top,
+      .stamp-bottom {
+        font-size: 7px;
+      }
+
+      .workbench {
+        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+      }
+
+      .source-card,
+      .settings-card {
+        padding: 22px;
+      }
+
+      .dropzone {
+        min-height: 450px;
+      }
+
+      .result-card {
+        gap: 26px;
+        padding: 26px;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-stamp {
+        display: none;
+      }
+
+      .workbench {
+        grid-template-columns: 1fr;
+      }
+
+      .dropzone {
+        min-height: 420px;
+      }
+
+      .settings-card {
+        min-height: 0;
+      }
+
+      .result-card {
+        grid-template-columns: 1fr;
+      }
+
+      .result-copy {
+        order: 1;
+      }
+
+      .result-stage {
+        order: 2;
+      }
+
+      .result-copy h2 br {
+        display: none;
+      }
+
+      .info-row {
+        gap: 20px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        width: calc(100% - 34px);
+      }
+
+      .site-header {
+        padding: 16px 0;
+      }
+
+      .brand-mark {
+        width: 38px;
+        height: 38px;
+      }
+
+      .brand-word {
+        font-size: 17px;
+      }
+
+      .local-pill {
+        padding: 7px 10px;
+        font-size: 8.5px;
+      }
+
+      .hero {
+        padding: 36px 0 27px;
+      }
+
+      .hero h1 {
+        margin-top: 14px;
+        font-size: clamp(2.9rem, 15vw, 4.3rem);
+      }
+
+      .eyebrow {
+        font-size: 9px;
+      }
+
+      .hero-lede {
+        font-size: 14px;
+        line-height: 1.72;
+      }
+
+      .hero-facts {
+        gap: 8px 14px;
+      }
+
+      .hero-facts span {
+        font-size: 10.5px;
+      }
+
+      .source-card,
+      .settings-card {
+        padding: 17px;
+        border-radius: 22px;
+      }
+
+      .card-heading {
+        margin-bottom: 16px;
+      }
+
+      .card-heading h2 {
+        font-size: 17px;
+      }
+
+      .dropzone {
+        min-height: 370px;
+        padding: 24px 18px;
+      }
+
+      .drop-art {
+        margin-bottom: 21px;
+        transform: scale(0.9);
+      }
+
+      .drop-copy h3 {
+        font-size: 19px;
+      }
+
+      .drop-copy p {
+        font-size: 11.5px;
+      }
+
+      .pick-pill {
+        margin-top: 19px;
+      }
+
+      .drop-foot {
+        margin-top: 19px;
+        font-size: 8px;
+      }
+
+      .file-meta {
+        font-size: 8px;
+        letter-spacing: 0;
+      }
+
+      .video-viewport {
+        border-radius: 12px;
+      }
+
+      .video-viewport video {
+        max-height: 360px;
+      }
+
+      .trim-head p {
+        max-width: 235px;
+      }
+
+      .timeline {
+        height: 58px;
+        margin-top: 11px;
+      }
+
+      .trim-handle::before {
+        height: 36px;
+      }
+
+      .time-row {
+        gap: 8px 10px;
+      }
+
+      .clip-total {
+        width: 100%;
+        margin-left: 0;
+        padding-left: 1px;
+      }
+
+      .keyboard-hint {
+        display: none;
+      }
+
+      .setting-block {
+        padding: 15px 0;
+      }
+
+      .toggle-row {
+        padding: 11px 0;
+      }
+
+      .estimate-box {
+        margin-top: 15px;
+      }
+
+      .action-area {
+        padding-top: 18px;
+      }
+
+      .result-card {
+        gap: 20px;
+        padding: 20px;
+        border-radius: 22px;
+      }
+
+      .result-copy h2 {
+        font-size: clamp(2.4rem, 10.5vw, 3.2rem);
+      }
+
+      .result-stats {
+        margin: 20px 0;
+      }
+
+      .result-stage {
+        padding: 10px;
+        border-radius: 15px;
+      }
+
+      .result-frame {
+        min-height: 200px;
+        max-height: 330px;
+        padding: 8px;
+      }
+
+      .result-frame img {
+        max-height: 314px;
+      }
+
+      .info-row {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        margin: 28px 0 34px;
+      }
+
+      .info-item {
+        padding-top: 12px;
+      }
+
+      .site-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding-bottom: 24px;
+      }
+
+      .toast {
+        right: 17px;
+        bottom: 17px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .hero h1 {
+        font-size: 2.8rem;
+      }
+
+      .segmented button {
+        font-size: 10px;
+      }
+
+      .time-readout {
+        font-size: 9.5px;
+      }
+
+      .time-readout strong {
+        font-size: 10px;
+      }
+
+      .time-readout {
+        gap: 4px;
+      }
+
+      .mini-button {
+        padding: 0 3px;
+        font-size: 8px;
+      }
+
+      .result-stats strong {
+        font-size: 10px;
+      }
+
+      .result-actions {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .download-btn,
+      .ghost-btn {
+        justify-content: center;
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .trim-handle {
+        width: 30px;
+      }
+
+      .mode-bar {
+        margin-bottom: 12px;
+      }
+
+      .mode-switch {
+        width: 100%;
+      }
+
+      .mode-tab {
+        flex: 1;
+        justify-content: center;
+        padding-right: 8px;
+        padding-left: 7px;
+      }
+
+      .mode-tab-copy strong {
+        font-size: 11.5px;
+      }
+
+      .mode-tab-copy small {
+        font-size: 8.5px;
+      }
+
+      .mode-bar-note {
+        display: none;
+      }
+
+      .image-preview-meta {
+        gap: 10px;
+      }
+
+      .image-preview-name {
+        font-size: 12px;
+      }
+
+      .image-preview-detail {
+        font-size: 8px;
+      }
+
+      .sequence-play-btn {
+        padding: 7px 9px;
+        font-size: 9.5px;
+      }
+
+      .image-stage {
+        min-height: 230px;
+        padding: 14px;
+      }
+
+      .image-card,
+      .image-add-card {
+        width: 116px;
+      }
+
+      .image-card-actions button {
+        height: 26px;
+      }
+
+      .image-seq-actions {
+        gap: 8px;
+      }
+
+      .image-canvas-note {
+        font-size: 8px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .mode-tab {
+        gap: 7px;
+      }
+
+      .mode-tab-icon {
+        width: 28px;
+        height: 28px;
+      }
+
+      .mode-tab-icon svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .mode-tab-copy strong {
+        font-size: 10.5px;
+      }
+
+      .mode-tab-copy small {
+        font-size: 8px;
+      }
+
+      .image-card,
+      .image-add-card {
+        width: 110px;
+      }
+    }
+
+    @media (max-width: 350px) {
+      .local-pill {
+        display: none;
+      }
+
+      .mode-tab-copy small {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#studio">跳到制作区</a>
+  <div class="paper-texture" aria-hidden="true"></div>
+  <div class="page">
+    <header class="site-header">
+      <a class="brand" href="#" aria-label="帧间 Framegrab 首页">
+        <svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true">
+          <rect x="1" y="1" width="40" height="40" rx="12" fill="#181a15"/>
+          <path d="M16.5 13.2v15.6L29 21z" fill="#ff5b36"/>
+          <circle cx="9.5" cy="9.5" r="1.7" fill="#d8fb68"/>
+          <path d="M30 8.5h3.5M32 6v5" stroke="#f5f1e6" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+        </svg>
+        <span class="brand-word">
+          帧间
+          <small>FRAMEGRAB / VIDEO + IMAGE</small>
+        </span>
+      </a>
+      <div class="local-pill" title="视频与图片文件不会上传到任何服务器">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        文件不出本机
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow">
+            <span class="eyebrow-line" aria-hidden="true"></span>
+            浏览器 GIF 工具
+            <span class="version">LOCAL / V1.1</span>
+          </p>
+          <h1 id="page-title">把这一刻，<span class="hero-accent">截成循环。</span></h1>
+          <p class="hero-lede">导入一段视频，或选择一组图片，截取、排序、调好节奏，生成一张随时会动的 GIF。无需上传，无需安装，所有处理都在你的浏览器里完成。</p>
+          <div class="hero-facts" aria-label="产品特点">
+            <span>
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3.5 8.2 3 3 6-6.4"/></svg>
+              100% 本地处理
+            </span>
+            <span>
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3.5 8.2 3 3 6-6.4"/></svg>
+              视频 / 图片双模式
+            </span>
+            <span>
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3.5 8.2 3 3 6-6.4"/></svg>
+              一键下载
+            </span>
+          </div>
+        </div>
+        <div class="hero-stamp" aria-hidden="true">
+          <span class="stamp-top">NO UPLOAD</span>
+          <strong>100<span>%</span></strong>
+          <span class="stamp-bottom">LOCAL / PRIVATE</span>
+        </div>
+      </section>
+
+      <div class="mode-bar">
+        <div class="mode-switch" id="modeSwitch" role="group" aria-label="选择转换模式">
+          <button class="mode-tab" id="modeVideoTab" type="button" data-mode="video" aria-pressed="true">
+            <span class="mode-tab-icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4.5" width="16" height="11" rx="2"/><path d="M7 4.5v11M13 4.5v11M2 8h5M13 8h5M2 12h5M13 12h5"/></svg>
+            </span>
+            <span class="mode-tab-copy">
+              <strong>视频转 GIF</strong>
+              <small>截取一段动态</small>
+            </span>
+          </button>
+          <button class="mode-tab" id="modeImagesTab" type="button" data-mode="images" aria-pressed="false">
+            <span class="mode-tab-icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="12" height="10" rx="2"/><path d="M3 6v9a2 2 0 0 0 2 2h9"/><path d="m7.5 10 2.2-2.2 2 2 1.2-1.2 1.8 1.8"/><circle cx="13.5" cy="6.5" r="1"/></svg>
+            </span>
+            <span class="mode-tab-copy">
+              <strong>图片转 GIF</strong>
+              <small>编排一组画面</small>
+            </span>
+          </button>
+        </div>
+        <p class="mode-bar-note"><span aria-hidden="true"></span>两种模式，同一套本地编码器</p>
+      </div>
+
+      <section class="workbench" id="studio" aria-label="GIF 制作工作台">
+        <div class="card source-card" id="sourceCard">
+          <div class="card-heading">
+            <div class="heading-left">
+              <span class="step-tag">01</span>
+              <h2 id="sourceTitle">视频素材</h2>
+            </div>
+            <button class="text-button" id="replaceBtn" type="button" hidden>
+              <span id="replaceLabel">更换视频</span>
+              <svg class="replace-icon replace-icon-video" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5.5h10M3 10.5h10M5.5 3v10M10.5 3v10"/></svg>
+              <svg class="replace-icon replace-icon-images" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><path d="M8 3v10M3 8h10"/></svg>
+            </button>
+          </div>
+
+          <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="选择或拖入视频文件">
+            <div class="drop-art drop-art-video" id="videoDropArt" aria-hidden="true">
+              <span class="drop-frame"></span>
+              <span class="drop-frame"></span>
+              <span class="drop-frame"></span>
+              <span class="drop-play">
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><path d="M6.2 4.6v8.8L13.4 9z"/></svg>
+              </span>
+            </div>
+            <div class="drop-art drop-art-images" id="imagesDropArt" aria-hidden="true" hidden>
+              <span class="photo-frame photo-frame-one"></span>
+              <span class="photo-frame photo-frame-two"></span>
+              <span class="photo-frame photo-frame-three"></span>
+              <span class="image-add-badge">
+                <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 4v10M4 9h10"/></svg>
+              </span>
+            </div>
+            <div class="drop-copy">
+              <h3 id="dropTitle">拖入一段视频</h3>
+              <p id="dropHint">或点击选择文件 · MP4 / WebM / MOV</p>
+            </div>
+            <span class="pick-pill" id="pickPill">
+              <span id="pickLabel">选择视频</span>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+            </span>
+            <span class="drop-spinner" id="dropSpinner" hidden aria-hidden="true"></span>
+            <p class="drop-foot">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.6"/><path d="M5.3 7V5.2a2.7 2.7 0 0 1 5.4 0V7"/></svg>
+              文件只在当前页面中读取
+            </p>
+            <p class="drop-error" id="dropError" role="alert" hidden></p>
+          </div>
+
+          <div class="editor" id="editor" hidden>
+            <div class="file-strip">
+              <span class="file-icon" aria-hidden="true">
+                <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><rect x="1.7" y="4" width="14.6" height="10" rx="2"/><path d="M5 4v10M13 4v10M1.7 7H5M13 7h3.3M1.7 11H5M13 11h3.3"/></svg>
+              </span>
+              <div class="file-details">
+                <p class="file-name" id="fileName">视频文件</p>
+                <p class="file-meta" id="fileMeta">—</p>
+              </div>
+            </div>
+
+            <div class="video-viewport">
+              <video id="previewVideo" controls playsinline preload="metadata"></video>
+            </div>
+
+            <div class="trim-section">
+              <div class="trim-head">
+                <div>
+                  <h3>截取片段</h3>
+                  <p>拖动两侧把手，选择要保留的画面</p>
+                </div>
+                <span class="trim-duration" id="trimDuration">0.0 秒</span>
+              </div>
+
+              <div class="timeline" id="timeline" aria-label="视频截取时间轴">
+                <div class="filmstrip" id="filmstrip" aria-hidden="true"></div>
+                <div class="trim-shade trim-shade-left" id="shadeLeft"></div>
+                <div class="trim-shade trim-shade-right" id="shadeRight"></div>
+                <div class="trim-selection" id="trimSelection"></div>
+                <div class="playhead" id="playhead"></div>
+                <div class="trim-handle trim-handle-start" id="startHandle" data-handle="start" role="slider" tabindex="0" aria-label="片段开始时间" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+                  <span class="sr-only">片段开始时间</span>
+                </div>
+                <div class="trim-handle trim-handle-end" id="endHandle" data-handle="end" role="slider" tabindex="0" aria-label="片段结束时间" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+                  <span class="sr-only">片段结束时间</span>
+                </div>
+              </div>
+
+              <div class="time-row">
+                <div class="time-readout">
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>开始</span>
+                  <strong id="startLabel">00:00.0</strong>
+                  <button class="mini-button" type="button" data-set-bound="start">取当前</button>
+                </div>
+                <div class="time-readout is-end">
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>结束</span>
+                  <strong id="endLabel">00:00.0</strong>
+                  <button class="mini-button" type="button" data-set-bound="end">取当前</button>
+                </div>
+                <span class="clip-total">片段长度 <strong id="clipDuration">00:00.0</strong></span>
+              </div>
+              <p class="keyboard-hint">提示：选中把手后用 ← → 微调，按住 Shift 加快移动。</p>
+            </div>
+          </div>
+
+          <div class="editor image-editor" id="imageEditor" hidden>
+            <div class="image-preview-meta">
+              <div class="image-preview-title">
+                <p class="image-preview-name" id="imagePreviewName">图片预览</p>
+                <p class="image-preview-detail" id="imagePreviewDetail">—</p>
+              </div>
+              <button class="sequence-play-btn" id="imagePlayBtn" type="button" disabled aria-pressed="false">
+                <svg class="play-glyph" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.8 4.4v11.2L16 10z"/></svg>
+                <svg class="stop-glyph" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" hidden><rect x="6" y="6" width="8" height="8" rx="1.2"/></svg>
+                <span id="imagePlayLabel">预览序列</span>
+              </button>
+            </div>
+
+            <div class="image-stage" id="imageStage">
+              <div class="image-canvas-preview" id="imagePreviewFrame">
+                <img id="imagePreview" alt="选中的图片预览">
+                <span class="image-index-chip" id="imagePreviewIndex">1 / 0</span>
+              </div>
+            </div>
+            <div class="image-canvas-note">
+              <span>画布比例取自第一张图片</span>
+              <span id="imageCanvasDims">—</span>
+            </div>
+
+            <div class="image-sequence">
+              <div class="trim-head">
+                <div>
+                  <h3>图片序列</h3>
+                  <p>拖动卡片排序，点击图片可预览</p>
+                </div>
+                <div class="image-seq-actions">
+                  <span class="trim-duration" id="imageCountLabel">0 张</span>
+                  <button class="mini-button" id="clearImagesBtn" type="button">清空</button>
+                </div>
+              </div>
+              <div class="image-list" id="imageList" aria-label="图片序列，可拖动排序"></div>
+              <p class="keyboard-hint">提示：拖动卡片排序；卡片下方箭头可逐张移动；至少需要 2 张图片。</p>
+            </div>
+          </div>
+        </div>
+
+        <aside class="card settings-card" id="settingsCard" aria-labelledby="settings-title">
+          <div class="card-heading">
+            <div class="heading-left">
+              <span class="step-tag light">02</span>
+              <h2 id="settings-title">输出设置</h2>
+            </div>
+            <span class="local-chip"><span aria-hidden="true"></span>LOCAL</span>
+          </div>
+
+          <fieldset id="settingsFieldset" disabled>
+            <legend class="sr-only">GIF 输出设置</legend>
+
+            <div class="setting-block" id="fpsBlock">
+              <div class="field-label">
+                <span class="field-title" id="fpsTitle">帧率</span>
+                <span>FRAME RATE</span>
+              </div>
+              <div class="segmented" id="fpsGroup" role="group" aria-labelledby="fpsTitle">
+                <button type="button" data-fps="8" aria-pressed="false">8<small>fps</small></button>
+                <button type="button" data-fps="12" aria-pressed="false">12<small>fps</small></button>
+                <button type="button" data-fps="15" aria-pressed="false">15<small>fps</small></button>
+                <button type="button" data-fps="24" aria-pressed="false">24<small>fps</small></button>
+              </div>
+            </div>
+
+            <div class="setting-block" id="imageTimingBlock" hidden>
+              <div class="field-label">
+                <label class="field-title" for="imageDurationRange">停留时长</label>
+                <output id="imageDurationOutput" for="imageDurationRange">0.5 秒 / 张</output>
+              </div>
+              <input class="range" id="imageDurationRange" type="range" min="10" max="500" step="10" value="50" aria-label="每张图片的停留时长">
+              <div class="field-note">
+                <span>每张图片显示时长</span>
+                <span id="imageDurationTotal">—</span>
+              </div>
+            </div>
+
+            <div class="setting-block">
+              <div class="field-label">
+                <label class="field-title" for="widthRange">输出宽度</label>
+                <output id="widthOutput" for="widthRange">480 px</output>
+              </div>
+              <input class="range" id="widthRange" type="range" min="120" max="960" step="1" value="480" aria-label="GIF 输出宽度（像素）">
+              <div class="field-note">
+                <span id="sourceDimensions">保持原始比例</span>
+                <span id="outputDimensions">480 × 270</span>
+              </div>
+            </div>
+
+            <div class="setting-block" id="imageFitBlock" hidden>
+              <div class="field-label">
+                <span class="field-title" id="fitTitle">画面适配</span>
+                <span>FIT</span>
+              </div>
+              <div class="segmented" id="imageFitGroup" role="group" aria-labelledby="fitTitle">
+                <button type="button" data-fit="contain" aria-pressed="true">完整显示</button>
+                <button type="button" data-fit="cover" aria-pressed="false">填满画布</button>
+              </div>
+              <div class="fit-color-row">
+                <div class="fit-color-copy">
+                  <span class="fit-color-title">背景颜色</span>
+                  <small id="imageBackgroundNote">完整显示时的空白区域</small>
+                </div>
+                <label class="color-control" for="imageBackgroundInput">
+                  <span id="imageBackgroundValue">#11130F</span>
+                  <input type="color" id="imageBackgroundInput" value="#11130f" aria-label="GIF 背景颜色">
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-block">
+              <div class="field-label">
+                <span class="field-title" id="colorsTitle">颜色数量</span>
+                <span>COLORS</span>
+              </div>
+              <div class="segmented" id="colorGroup" role="group" aria-labelledby="colorsTitle">
+                <button type="button" data-colors="32" aria-pressed="false">32</button>
+                <button type="button" data-colors="64" aria-pressed="false">64</button>
+                <button type="button" data-colors="128" aria-pressed="false">128</button>
+                <button type="button" data-colors="256" aria-pressed="false">256</button>
+              </div>
+            </div>
+
+            <div class="toggle-block">
+              <label class="toggle-row">
+                <span class="toggle-copy">
+                  <strong>色彩抖动</strong>
+                  <small>减少渐变色带，GIF 文件会略大一些</small>
+                </span>
+                <input id="ditherToggle" type="checkbox" checked>
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+              <label class="toggle-row">
+                <span class="toggle-copy">
+                  <strong>无限循环</strong>
+                  <small>关闭后，GIF 只播放一次</small>
+                </span>
+                <input id="loopToggle" type="checkbox" checked>
+                <span class="switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+
+            <div class="estimate-box" aria-live="polite">
+              <div>
+                <span id="estimateFramesLabel">预计帧数</span>
+                <strong id="estimateFrames">—</strong>
+              </div>
+              <div>
+                <span>输出尺寸</span>
+                <strong id="estimateSize">—</strong>
+              </div>
+            </div>
+            <p class="limit-hint" id="limitHint" hidden></p>
+          </fieldset>
+
+          <div class="action-area">
+            <button class="generate-btn" id="generateBtn" type="button" disabled>
+              <span id="generateLabel">生成 GIF</span>
+              <span class="btn-icon" aria-hidden="true">
+                <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14 14 6M7.2 6H14v6.8"/></svg>
+              </span>
+            </button>
+
+            <div class="progress-panel" id="progressPanel" hidden>
+              <div class="progress-copy">
+                <span id="progressStage">准备中…</span>
+                <span id="progressValue">0%</span>
+              </div>
+              <div class="progress-track" id="progressTrack" role="progressbar" aria-label="GIF 生成进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div class="progress-bar" id="progressBar"></div>
+              </div>
+              <div class="progress-footer">
+                <span id="framesProgress">—</span>
+                <button class="cancel-button" id="cancelBtn" type="button">取消</button>
+              </div>
+            </div>
+
+            <p class="trust-note">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.6"/><path d="M5.3 7V5.2a2.7 2.7 0 0 1 5.4 0V7"/></svg>
+              文件不会上传，生成后可立即下载
+            </p>
+            <p class="settings-error" id="settingsError" role="alert" hidden></p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="result-card" id="resultCard" aria-labelledby="result-title" hidden>
+        <div class="result-copy">
+          <p class="result-kicker"><span class="result-dot" aria-hidden="true"></span>GIF READY <span class="result-source" id="resultSource">VIDEO</span></p>
+          <h2 id="result-title">成片，<br>正在循环。</h2>
+          <p class="result-sub">编码已在你的设备上完成。下载这张 GIF，让它继续循环下去。</p>
+          <div class="result-stats">
+            <div>
+              <span>SIZE</span>
+              <strong id="resultDimensions">—</strong>
+            </div>
+            <div>
+              <span>FRAMES</span>
+              <strong id="resultFrames">—</strong>
+            </div>
+            <div>
+              <span>FILE</span>
+              <strong id="resultFilesize">—</strong>
+            </div>
+          </div>
+          <div class="result-actions">
+            <a class="download-btn" id="downloadBtn" href="#" download>
+              下载 GIF
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5M4 16h12"/></svg>
+            </a>
+            <button class="ghost-btn" id="adjustBtn" type="button">调整设置</button>
+          </div>
+          <p class="result-filename" id="resultFilename"></p>
+        </div>
+        <div class="result-stage">
+          <div class="result-frame">
+            <img id="gifPreview" alt="生成的 GIF 动画预览">
+          </div>
+          <div class="stage-label">
+            <span>PREVIEW / 100%</span>
+            <span id="resultLoops">LOOP</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="info-row" aria-label="使用提示">
+        <article class="info-item">
+          <span class="info-index">01 / PRIVATE</span>
+          <h3>素材不离开你的设备</h3>
+          <p>视频和图片都由浏览器本地读取、解码与编码，不上传文件，也不依赖远程服务。</p>
+        </article>
+        <article class="info-item">
+          <span class="info-index">02 / CONTROL</span>
+          <h3>视频切片，图片编排</h3>
+          <p>视频可裁剪与调速；图片可排序、设置停留时长、适配方式和背景色，兼顾画质与体积。</p>
+        </article>
+        <article class="info-item">
+          <span class="info-index">03 / FORMAT</span>
+          <h3>格式取决于浏览器</h3>
+          <p>视频推荐 H.264 MP4 或 WebM；图片支持 JPG、PNG、WebP、AVIF、BMP。单次最多 500 帧。</p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span class="footer-brand">帧间 <span>FRAMEGRAB</span></span>
+      <span>VIDEO + IMAGES → GIF · 100% IN-BROWSER · 2026</span>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <input type="file" id="fileInput" accept="video/*,.mkv,.mov,.m4v" hidden>
+  <input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp,image/avif,image/bmp,.jpg,.jpeg,.png,.webp,.avif,.bmp" multiple hidden>
+  <noscript><div class="noscript">请启用 JavaScript 后再使用本工具。</div></noscript>
+
+  <script id="gif-core">
+/* GIF CORE START */
+(function (global) {
+  "use strict";
+
+  var HIST_SIZE = 32768; // 5 bits per channel
+
+  function clampChannel(value) {
+    if (value < 0) return 0;
+    if (value > 255) return 255;
+    return value;
+  }
+
+  function makeBox(colors) {
+    var rMin = 255;
+    var rMax = 0;
+    var gMin = 255;
+    var gMax = 0;
+    var bMin = 255;
+    var bMax = 0;
+    var total = 0;
+
+    for (var i = 0; i < colors.length; i++) {
+      var color = colors[i];
+      if (color.r < rMin) rMin = color.r;
+      if (color.r > rMax) rMax = color.r;
+      if (color.g < gMin) gMin = color.g;
+      if (color.g > gMax) gMax = color.g;
+      if (color.b < bMin) bMin = color.b;
+      if (color.b > bMax) bMax = color.b;
+      total += color.n;
+    }
+
+    var rRange = rMax - rMin;
+    var gRange = gMax - gMin;
+    var bRange = bMax - bMin;
+    var channel = 0;
+    var maxRange = rRange;
+
+    if (gRange > maxRange) {
+      channel = 1;
+      maxRange = gRange;
+    }
+    if (bRange > maxRange) {
+      channel = 2;
+      maxRange = bRange;
+    }
+
+    return {
+      colors: colors,
+      total: total,
+      maxRange: maxRange,
+      channel: channel
+    };
+  }
+
+  function averageBox(box) {
+    var r = 0;
+    var g = 0;
+    var b = 0;
+    var total = 0;
+
+    for (var i = 0; i < box.colors.length; i++) {
+      var color = box.colors[i];
+      r += color.r * color.n;
+      g += color.g * color.n;
+      b += color.b * color.n;
+      total += color.n;
+    }
+
+    if (!total) return [0, 0, 0];
+    return [
+      clampChannel(Math.round(r / total)),
+      clampChannel(Math.round(g / total)),
+      clampChannel(Math.round(b / total))
+    ];
+  }
+
+  /**
+   * Build a shared palette from several RGBA pixel buffers using median cut.
+   * Each buffer is the raw Uint8ClampedArray from ImageData.
+   */
+  function createPalette(pixelCollections, maxColors) {
+    var hist = new Uint32Array(HIST_SIZE);
+    var sumR = new Float64Array(HIST_SIZE);
+    var sumG = new Float64Array(HIST_SIZE);
+    var sumB = new Float64Array(HIST_SIZE);
+    var collections = pixelCollections || [];
+
+    for (var s = 0; s < collections.length; s++) {
+      var data = collections[s];
+      if (!data || data.length < 4) continue;
+
+      for (var p = 0; p < data.length; p += 4) {
+        if (data[p + 3] < 128) continue;
+        var index = ((data[p] >> 3) << 10) | ((data[p + 1] >> 3) << 5) | (data[p + 2] >> 3);
+        hist[index]++;
+        sumR[index] += data[p];
+        sumG[index] += data[p + 1];
+        sumB[index] += data[p + 2];
+      }
+    }
+
+    var colors = [];
+    for (var h = 0; h < HIST_SIZE; h++) {
+      var count = hist[h];
+      if (!count) continue;
+      colors.push({
+        r: sumR[h] / count,
+        g: sumG[h] / count,
+        b: sumB[h] / count,
+        n: count
+      });
+    }
+
+    if (!colors.length) {
+      return [[24, 26, 21], [245, 241, 230]];
+    }
+
+    var target = Math.max(2, Math.min(256, Math.floor(maxColors) || 256));
+    var boxes = [makeBox(colors)];
+
+    while (boxes.length < target) {
+      var pick = -1;
+      var bestScore = -1;
+
+      for (var i = 0; i < boxes.length; i++) {
+        var candidate = boxes[i];
+        if (candidate.colors.length < 2 || candidate.maxRange < 1) continue;
+
+        // Favor boxes that contain both many pixels and a wide color range.
+        var score = candidate.total * (candidate.maxRange + 1);
+        if (score > bestScore) {
+          bestScore = score;
+          pick = i;
+        }
+      }
+
+      if (pick < 0) break;
+
+      var box = boxes[pick];
+      var channelKey = box.channel === 0 ? "r" : box.channel === 1 ? "g" : "b";
+      box.colors.sort(function (a, b) {
+        return a[channelKey] - b[channelKey] || a.n - b.n;
+      });
+
+      var half = box.total / 2;
+      var sum = 0;
+      var cut = box.colors.length - 1;
+
+      for (var c = 0; c < box.colors.length - 1; c++) {
+        sum += box.colors[c].n;
+        if (sum >= half) {
+          cut = c + 1;
+          break;
+        }
+      }
+
+      if (cut < 1) cut = 1;
+      if (cut >= box.colors.length) cut = box.colors.length - 1;
+
+      var left = box.colors.slice(0, cut);
+      var right = box.colors.slice(cut);
+      boxes.splice(pick, 1, makeBox(left), makeBox(right));
+    }
+
+    var palette = [];
+    var seen = new Set();
+
+    for (var b = 0; b < boxes.length; b++) {
+      var rgb = averageBox(boxes[b]);
+      var key = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      palette.push(rgb);
+      if (palette.length >= 256) break;
+    }
+
+    if (!palette.length) palette.push([24, 26, 21]);
+    if (palette.length === 1) {
+      var only = palette[0];
+      palette.push([
+        only[0] > 127 ? 0 : 255,
+        only[1] > 127 ? 0 : 255,
+        only[2] > 127 ? 0 : 255
+      ]);
+    }
+
+    return palette;
+  }
+
+  /**
+   * Precompute nearest-palette lookups, then quantize frames with optional
+   * serpentine Floyd–Steinberg dithering.
+   */
+  function createQuantizer(palette) {
+    var colors = [];
+    var input = palette || [];
+
+    for (var i = 0; i < input.length && colors.length < 256; i++) {
+      var color = input[i];
+      if (!color || color.length < 3) continue;
+      colors.push([
+        clampChannel(Math.round(color[0])),
+        clampChannel(Math.round(color[1])),
+        clampChannel(Math.round(color[2]))
+      ]);
+    }
+
+    if (!colors.length) colors.push([0, 0, 0], [255, 255, 255]);
+    if (colors.length === 1) colors.push([255 - colors[0][0], 255 - colors[0][1], 255 - colors[0][2]]);
+
+    var size = colors.length;
+    var pr = new Uint8Array(size);
+    var pg = new Uint8Array(size);
+    var pb = new Uint8Array(size);
+
+    for (var c = 0; c < size; c++) {
+      pr[c] = colors[c][0];
+      pg[c] = colors[c][1];
+      pb[c] = colors[c][2];
+    }
+
+    // 32×32×32 nearest-color cache: one lookup per source pixel while dithering.
+    var lut = new Uint8Array(HIST_SIZE);
+    for (var idx = 0; idx < HIST_SIZE; idx++) {
+      var r = ((idx >> 10) & 31) * 8 + 4;
+      var g = ((idx >> 5) & 31) * 8 + 4;
+      var blue = (idx & 31) * 8 + 4;
+      var best = 0;
+      var bestDistance = Infinity;
+
+      for (var j = 0; j < size; j++) {
+        var dr = r - pr[j];
+        var dg = g - pg[j];
+        var db = blue - pb[j];
+        var distance = dr * dr * 2 + dg * dg * 4 + db * db * 3;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = j;
+          if (distance === 0) break;
+        }
+      }
+
+      lut[idx] = best;
+    }
+
+    var errorA = null;
+    var errorB = null;
+    var errorWidth = -1;
+
+    function quantize(imageData, useDither) {
+      var width = imageData.width;
+      var height = imageData.height;
+      var data = imageData.data;
+      var output = new Uint8Array(width * height);
+
+      if (!useDither) {
+        for (var pixel = 0, offset = 0; pixel < output.length; pixel++, offset += 4) {
+          var lookup = ((data[offset] >> 3) << 10) | ((data[offset + 1] >> 3) << 5) | (data[offset + 2] >> 3);
+          output[pixel] = lut[lookup];
+        }
+        return output;
+      }
+
+      var stride = (width + 2) * 3;
+      if (errorWidth !== width) {
+        errorA = new Float32Array(stride);
+        errorB = new Float32Array(stride);
+        errorWidth = width;
+      } else {
+        errorA.fill(0);
+        errorB.fill(0);
+      }
+
+      var currentError = errorA;
+      var nextError = errorB;
+
+      for (var y = 0; y < height; y++) {
+        var direction = (y & 1) === 0 ? 1 : -1;
+        var x = direction === 1 ? 0 : width - 1;
+        var end = direction === 1 ? width : -1;
+
+        for (; x !== end; x += direction) {
+          var sourceOffset = (y * width + x) * 4;
+          var errorOffset = (x + 1) * 3;
+
+          var red = data[sourceOffset] + currentError[errorOffset];
+          var green = data[sourceOffset + 1] + currentError[errorOffset + 1];
+          var blueValue = data[sourceOffset + 2] + currentError[errorOffset + 2];
+
+          if (red < 0) red = 0;
+          else if (red > 255) red = 255;
+          if (green < 0) green = 0;
+          else if (green > 255) green = 255;
+          if (blueValue < 0) blueValue = 0;
+          else if (blueValue > 255) blueValue = 255;
+
+          var bucket = ((red >> 3) << 10) | ((green >> 3) << 5) | (blueValue >> 3);
+          var paletteIndex = lut[bucket];
+          output[y * width + x] = paletteIndex;
+
+          var redError = red - pr[paletteIndex];
+          var greenError = green - pg[paletteIndex];
+          var blueError = blueValue - pb[paletteIndex];
+
+          var ahead = (x + direction + 1) * 3;
+          var behindDiagonal = (x - direction + 1) * 3;
+          var below = (x + 1) * 3;
+          var aheadDiagonal = ahead;
+
+          currentError[ahead] += redError * 0.4375;
+          currentError[ahead + 1] += greenError * 0.4375;
+          currentError[ahead + 2] += blueError * 0.4375;
+
+          nextError[behindDiagonal] += redError * 0.1875;
+          nextError[behindDiagonal + 1] += greenError * 0.1875;
+          nextError[behindDiagonal + 2] += blueError * 0.1875;
+
+          nextError[below] += redError * 0.3125;
+          nextError[below + 1] += greenError * 0.3125;
+          nextError[below + 2] += blueError * 0.3125;
+
+          nextError[aheadDiagonal] += redError * 0.0625;
+          nextError[aheadDiagonal + 1] += greenError * 0.0625;
+          nextError[aheadDiagonal + 2] += blueError * 0.0625;
+        }
+
+        var swap = currentError;
+        currentError = nextError;
+        nextError = swap;
+        nextError.fill(0);
+      }
+
+      return output;
+    }
+
+    return {
+      palette: colors,
+      quantize: quantize
+    };
+  }
+
+  function ByteWriter() {
+    this.parts = [];
+    this.chunk = new Uint8Array(65536);
+    this.position = 0;
+    this.length = 0;
+  }
+
+  ByteWriter.prototype.flush = function () {
+    if (!this.position) return;
+    this.parts.push(this.chunk.slice(0, this.position));
+    this.position = 0;
+  };
+
+  ByteWriter.prototype.byte = function (value) {
+    if (this.position >= this.chunk.length) this.flush();
+    this.chunk[this.position++] = value & 255;
+    this.length++;
+  };
+
+  ByteWriter.prototype.bytes = function (values) {
+    var offset = 0;
+    while (offset < values.length) {
+      if (this.position >= this.chunk.length) this.flush();
+      var available = Math.min(values.length - offset, this.chunk.length - this.position);
+      this.chunk.set(values.subarray(offset, offset + available), this.position);
+      this.position += available;
+      this.length += available;
+      offset += available;
+    }
+  };
+
+  ByteWriter.prototype.u16 = function (value) {
+    this.byte(value & 255);
+    this.byte((value >> 8) & 255);
+  };
+
+  ByteWriter.prototype.ascii = function (text) {
+    for (var i = 0; i < text.length; i++) this.byte(text.charCodeAt(i));
+  };
+
+  ByteWriter.prototype.finish = function () {
+    this.flush();
+    var result = new Uint8Array(this.length);
+    var offset = 0;
+    for (var i = 0; i < this.parts.length; i++) {
+      result.set(this.parts[i], offset);
+      offset += this.parts[i].length;
+    }
+    this.parts = [];
+    return result;
+  };
+
+  /**
+   * GIF LZW compressor. Writes byte-sized sub-blocks directly to the writer.
+   */
+  function writeLzwData(pixels, minCodeSize, writer) {
+    var clearCode = 1 << minCodeSize;
+    var endCode = clearCode + 1;
+    var codeSize = minCodeSize + 1;
+    var nextCode = endCode + 1;
+    var dictionary = new Map();
+    var bitBuffer = 0;
+    var bitCount = 0;
+    var block = new Uint8Array(255);
+    var blockLength = 0;
+
+    function flushBlock() {
+      if (!blockLength) return;
+      writer.byte(blockLength);
+      writer.bytes(block.subarray(0, blockLength));
+      blockLength = 0;
+    }
+
+    function writeDataByte(value) {
+      block[blockLength++] = value & 255;
+      if (blockLength === 255) flushBlock();
+    }
+
+    function emit(code) {
+      bitBuffer |= code << bitCount;
+      bitCount += codeSize;
+      while (bitCount >= 8) {
+        writeDataByte(bitBuffer & 255);
+        bitBuffer >>>= 8;
+        bitCount -= 8;
+      }
+    }
+
+    emit(clearCode);
+
+    if (pixels.length) {
+      var prefix = pixels[0];
+
+      for (var i = 1; i < pixels.length; i++) {
+        var next = pixels[i];
+        var key = (prefix << 8) | next;
+        var found = dictionary.get(key);
+
+        if (found !== undefined) {
+          prefix = found;
+          continue;
+        }
+
+        emit(prefix);
+
+        if (nextCode < 4096) {
+          dictionary.set(key, nextCode);
+          nextCode++;
+          // GIF's code width grows one dictionary entry after the naive LZW
+          // threshold because the decoder registers the entry one code later.
+          if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
+        } else {
+          emit(clearCode);
+          dictionary.clear();
+          codeSize = minCodeSize + 1;
+          nextCode = endCode + 1;
+        }
+
+        prefix = next;
+      }
+
+      emit(prefix);
+    }
+
+    emit(endCode);
+    if (bitCount > 0) writeDataByte(bitBuffer & 255);
+    flushBlock();
+    writer.byte(0);
+  }
+
+  /**
+   * Stream a GIF89a animation. Palette and logical dimensions are shared by
+   * every frame; full-canvas frames mean disposal method 1 is sufficient.
+   */
+  function createGifEncoder(width, height, palette, options) {
+    var w = Math.round(Number(width));
+    var h = Math.round(Number(height));
+
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1 || w > 65535 || h > 65535) {
+      throw new Error("GIF 尺寸无效");
+    }
+
+    var sourcePalette = palette || [];
+    if (!sourcePalette.length) sourcePalette = [[0, 0, 0], [255, 255, 255]];
+
+    var tableSize = 2;
+    while (tableSize < sourcePalette.length && tableSize < 256) tableSize *= 2;
+
+    var bitsPerPixel = Math.round(Math.log(tableSize) / Math.log(2));
+    var minCodeSize = Math.max(2, bitsPerPixel);
+    var writer = new ByteWriter();
+    var finished = false;
+    var frameCount = 0;
+
+    writer.ascii("GIF89a");
+    writer.u16(w);
+    writer.u16(h);
+    writer.byte(0x80 | 0x70 | (bitsPerPixel - 1));
+    writer.byte(0);
+    writer.byte(0);
+
+    var globalColorTable = new Uint8Array(tableSize * 3);
+    for (var i = 0; i < tableSize; i++) {
+      var color = sourcePalette[i] || [0, 0, 0];
+      globalColorTable[i * 3] = clampChannel(Math.round(color[0]));
+      globalColorTable[i * 3 + 1] = clampChannel(Math.round(color[1]));
+      globalColorTable[i * 3 + 2] = clampChannel(Math.round(color[2]));
+    }
+    writer.bytes(globalColorTable);
+
+    var shouldLoop = !options || options.loop !== false;
+    if (shouldLoop) {
+      writer.byte(0x21);
+      writer.byte(0xff);
+      writer.byte(0x0b);
+      writer.ascii("NETSCAPE2.0");
+      writer.byte(0x03);
+      writer.byte(0x01);
+      writer.u16(0); // 0 = loop forever
+      writer.byte(0);
+    }
+
+    function addFrame(indices, delayCentiseconds) {
+      if (finished) throw new Error("GIF 已结束写入");
+      if (!indices || indices.length !== w * h) {
+        throw new Error("GIF 帧尺寸与画布不一致");
+      }
+
+      var delay = Math.max(1, Math.min(65535, Math.round(Number(delayCentiseconds) || 0)));
+
+      writer.byte(0x21);
+      writer.byte(0xf9);
+      writer.byte(0x04);
+      writer.byte(0x04); // disposal = 1, no transparency
+      writer.u16(delay);
+      writer.byte(0);
+      writer.byte(0);
+
+      writer.byte(0x2c);
+      writer.u16(0);
+      writer.u16(0);
+      writer.u16(w);
+      writer.u16(h);
+      writer.byte(0);
+      writer.byte(minCodeSize);
+
+      writeLzwData(indices, minCodeSize, writer);
+      frameCount++;
+    }
+
+    function finish() {
+      if (finished) throw new Error("GIF 已结束写入");
+      finished = true;
+      writer.byte(0x3b);
+      return writer.finish();
+    }
+
+    return {
+      addFrame: addFrame,
+      finish: finish,
+      get frameCount() {
+        return frameCount;
+      },
+      width: w,
+      height: h
+    };
+  }
+
+  global.GifCore = {
+    createPalette: createPalette,
+    createQuantizer: createQuantizer,
+    createGifEncoder: createGifEncoder
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+/* GIF CORE END */
+  </script>
+  <script>
+/* APP START */
+(function () {
+  "use strict";
+
+  var Core = window.GifCore;
+  if (!Core) return;
+
+  var MAX_FRAMES = 500;
+  var DEFAULT_CLIP_SECONDS = 10;
+  var MIN_TRIM_GAP = 0.05;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var el = {
+    modeSwitch: $("modeSwitch"),
+    modeTabs: document.querySelectorAll(".mode-tab"),
+    sourceTitle: $("sourceTitle"),
+    dropzone: $("dropzone"),
+    dropTitle: $("dropTitle"),
+    dropHint: $("dropHint"),
+    pickPill: $("pickPill"),
+    pickLabel: $("pickLabel"),
+    dropSpinner: $("dropSpinner"),
+    dropError: $("dropError"),
+    videoDropArt: $("videoDropArt"),
+    imagesDropArt: $("imagesDropArt"),
+    fileInput: $("fileInput"),
+    imageInput: $("imageInput"),
+    replaceBtn: $("replaceBtn"),
+    replaceLabel: $("replaceLabel"),
+    replaceIconVideo: document.querySelector(".replace-icon-video"),
+    replaceIconImages: document.querySelector(".replace-icon-images"),
+    editor: $("editor"),
+    previewVideo: $("previewVideo"),
+    imageEditor: $("imageEditor"),
+    imagePreviewFrame: $("imagePreviewFrame"),
+    imagePreview: $("imagePreview"),
+    imagePreviewName: $("imagePreviewName"),
+    imagePreviewDetail: $("imagePreviewDetail"),
+    imagePreviewIndex: $("imagePreviewIndex"),
+    imageStage: $("imageStage"),
+    imageCanvasDims: $("imageCanvasDims"),
+    imagePlayBtn: $("imagePlayBtn"),
+    imagePlayLabel: $("imagePlayLabel"),
+    imageCountLabel: $("imageCountLabel"),
+    imageList: $("imageList"),
+    clearImagesBtn: $("clearImagesBtn"),
+    fileName: $("fileName"),
+    fileMeta: $("fileMeta"),
+    timeline: $("timeline"),
+    filmstrip: $("filmstrip"),
+    shadeLeft: $("shadeLeft"),
+    shadeRight: $("shadeRight"),
+    trimSelection: $("trimSelection"),
+    playhead: $("playhead"),
+    startHandle: $("startHandle"),
+    endHandle: $("endHandle"),
+    startLabel: $("startLabel"),
+    endLabel: $("endLabel"),
+    clipDuration: $("clipDuration"),
+    trimDuration: $("trimDuration"),
+    settingsCard: $("settingsCard"),
+    settingsFieldset: $("settingsFieldset"),
+    fpsBlock: $("fpsBlock"),
+    imageTimingBlock: $("imageTimingBlock"),
+    imageFitBlock: $("imageFitBlock"),
+    fpsGroup: $("fpsGroup"),
+    imageDurationRange: $("imageDurationRange"),
+    imageDurationOutput: $("imageDurationOutput"),
+    imageDurationTotal: $("imageDurationTotal"),
+    imageFitGroup: $("imageFitGroup"),
+    imageBackgroundInput: $("imageBackgroundInput"),
+    imageBackgroundValue: $("imageBackgroundValue"),
+    imageBackgroundNote: $("imageBackgroundNote"),
+    colorGroup: $("colorGroup"),
+    widthRange: $("widthRange"),
+    widthOutput: $("widthOutput"),
+    sourceDimensions: $("sourceDimensions"),
+    outputDimensions: $("outputDimensions"),
+    ditherToggle: $("ditherToggle"),
+    loopToggle: $("loopToggle"),
+    estimateFramesLabel: $("estimateFramesLabel"),
+    estimateFrames: $("estimateFrames"),
+    estimateSize: $("estimateSize"),
+    limitHint: $("limitHint"),
+    generateBtn: $("generateBtn"),
+    generateLabel: $("generateLabel"),
+    progressPanel: $("progressPanel"),
+    progressStage: $("progressStage"),
+    progressValue: $("progressValue"),
+    progressTrack: $("progressTrack"),
+    progressBar: $("progressBar"),
+    framesProgress: $("framesProgress"),
+    cancelBtn: $("cancelBtn"),
+    settingsError: $("settingsError"),
+    resultCard: $("resultCard"),
+    gifPreview: $("gifPreview"),
+    resultSource: $("resultSource"),
+    resultDimensions: $("resultDimensions"),
+    resultFrames: $("resultFrames"),
+    resultFilesize: $("resultFilesize"),
+    resultLoops: $("resultLoops"),
+    resultFilename: $("resultFilename"),
+    downloadBtn: $("downloadBtn"),
+    adjustBtn: $("adjustBtn"),
+    toast: $("toast")
+  };
+
+  var state = {
+    mode: "video",
+    file: null,
+    url: null,
+    duration: 0,
+    videoWidth: 0,
+    videoHeight: 0,
+    trimStart: 0,
+    trimEnd: 0,
+    fps: 12,
+    width: 480,
+    height: 270,
+    videoWidthPref: 480,
+    imageWidthPref: 480,
+    colors: 128,
+    dither: true,
+    loop: true,
+    loaded: false,
+    images: [],
+    selectedImageId: null,
+    imageDuration: 0.5,
+    imageFit: "contain",
+    imageBackground: "#11130f",
+    previewPlaying: false,
+    loading: false,
+    busy: false,
+    cancelRequested: false,
+    resultUrl: null
+  };
+
+  var MAX_IMAGES = 500;
+  var loadToken = 0;
+  var filmstripToken = 0;
+  var toastTimer = 0;
+  var playheadRaf = 0;
+  var previewPlayTimer = 0;
+  var timelineDrag = null;
+  var imageDragId = null;
+  var imageIdSeed = 0;
+  var dragDepth = 0;
+  var filmTiles = [];
+
+  var filmVideo = createHiddenVideo();
+  var captureVideo = createHiddenVideo();
+
+  function createHiddenVideo() {
+    var video = document.createElement("video");
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
+    video.setAttribute("aria-hidden", "true");
+    video.disablePictureInPicture = true;
+    video.style.cssText = "position:fixed;left:-10000px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;";
+    document.body.appendChild(video);
+    return video;
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function formatTime(value, decimals) {
+    var places = typeof decimals === "number" ? decimals : 1;
+    var seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
+
+    var minutes = Math.floor(seconds / 60);
+    var remainder = seconds - minutes * 60;
+    var secondsText = remainder.toFixed(places);
+
+    if (Number(secondsText) >= 60) {
+      minutes += 1;
+      secondsText = (0).toFixed(places);
+    }
+
+    var targetLength = places > 0 ? 3 + places : 2;
+    return pad2(minutes) + ":" + secondsText.padStart(targetLength, "0");
+  }
+
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+    var units = ["B", "KB", "MB", "GB"];
+    var index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+    var number = bytes / Math.pow(1024, index);
+    var rounded = index === 0 || number >= 100 ? Math.round(number) : number.toFixed(1);
+    return rounded + " " + units[index];
+  }
+
+  function formatFileKind(file) {
+    var name = (file && file.name) || "";
+    var extension = name.indexOf(".") > -1 ? name.split(".").pop().toUpperCase() : "";
+    if (extension && extension.length <= 5) return extension;
+    var mime = (file && file.type) ? file.type.split("/").pop().toUpperCase() : "VIDEO";
+    return mime || "VIDEO";
+  }
+
+  function looksLikeVideo(file) {
+    if (!file) return false;
+    if (file.type && file.type.indexOf("video/") === 0) return true;
+    return /\.(mp4|m4v|webm|mov|ogv|ogg|mkv|avi|3gp|ts)$/i.test(file.name || "");
+  }
+
+  function looksLikeImage(file) {
+    if (!file) return false;
+    if (file.type && file.type.indexOf("image/") === 0) {
+      return !/svg|gif/i.test(file.type);
+    }
+    return /\.(jpe?g|jfif|png|webp|avif|bmp)$/i.test(file.name || "");
+  }
+
+  function isImageMode() {
+    return state.mode === "images";
+  }
+
+  function hasActiveSource() {
+    return isImageMode() ? state.images.length > 0 : state.loaded;
+  }
+
+  function getActiveSourceSize() {
+    if (!isImageMode()) {
+      if (!state.loaded) return null;
+      return { width: state.videoWidth, height: state.videoHeight };
+    }
+
+    var first = state.images[0];
+    if (!first) return null;
+    return { width: first.width, height: first.height };
+  }
+
+  function getSelectedImage() {
+    for (var i = 0; i < state.images.length; i++) {
+      if (state.images[i].id === state.selectedImageId) return state.images[i];
+    }
+    return state.images[0] || null;
+  }
+
+  function getSelectedImageIndex() {
+    for (var i = 0; i < state.images.length; i++) {
+      if (state.images[i].id === state.selectedImageId) return i;
+    }
+    return -1;
+  }
+
+  function getImageDelayCs() {
+    return clamp(Math.round(state.imageDuration * 100), 1, 65535);
+  }
+
+  function getImagePlan() {
+    var count = state.images.length;
+    var delayCs = getImageDelayCs();
+    return {
+      frameCount: count,
+      delayCs: delayCs,
+      totalDuration: count * delayCs / 100,
+      tooFew: count < 2,
+      overLimit: count > MAX_FRAMES
+    };
+  }
+
+  function setModeTabsDisabled(disabled) {
+    for (var i = 0; i < el.modeTabs.length; i++) {
+      el.modeTabs[i].disabled = disabled;
+    }
+  }
+
+  function splitFilename(filename) {
+    return (filename || "framegrab").replace(/\.[^.]+$/, "");
+  }
+
+  function safeFilenameBase(filename) {
+    return splitFilename(filename)
+      .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "-")
+      .trim()
+      .slice(0, 70) || "framegrab";
+  }
+
+  function showToast(message, type) {
+    window.clearTimeout(toastTimer);
+    el.toast.textContent = message;
+    el.toast.classList.toggle("is-error", type === "error");
+    el.toast.classList.add("is-visible");
+    toastTimer = window.setTimeout(function () {
+      el.toast.classList.remove("is-visible");
+    }, type === "error" ? 4400 : 3200);
+  }
+
+  function showDropError(message) {
+    el.dropError.textContent = message;
+    el.dropError.hidden = false;
+  }
+
+  function clearDropError() {
+    el.dropError.hidden = true;
+    el.dropError.textContent = "";
+  }
+
+  function setSettingsError(message) {
+    el.settingsError.textContent = message || "";
+    el.settingsError.hidden = !message;
+  }
+
+  function resetDropPrompt() {
+    if (isImageMode()) {
+      el.dropTitle.textContent = "拖入几张图片";
+      el.dropHint.textContent = "或点击选择 · JPG / PNG / WebP · 支持多选";
+      el.pickLabel.textContent = "选择图片";
+    } else {
+      el.dropTitle.textContent = "拖入一段视频";
+      el.dropHint.textContent = "或点击选择文件 · MP4 / WebM / MOV";
+      el.pickLabel.textContent = "选择视频";
+    }
+  }
+
+  function updateModeControls() {
+    for (var i = 0; i < el.modeTabs.length; i++) {
+      var tab = el.modeTabs[i];
+      tab.setAttribute("aria-pressed", String(tab.dataset.mode === state.mode));
+    }
+  }
+
+  function syncSettingsAvailability() {
+    el.settingsFieldset.disabled = !hasActiveSource() || state.busy || state.loading;
+  }
+
+  function updateSettingsModeUi() {
+    var imageMode = isImageMode();
+    el.fpsBlock.hidden = imageMode;
+    el.imageTimingBlock.hidden = !imageMode;
+    el.imageFitBlock.hidden = !imageMode;
+    updateFitButtons();
+    updateImageTimingUi();
+  }
+
+  function updateSourceModeUi() {
+    var imageMode = isImageMode();
+    var ready = hasActiveSource();
+
+    el.sourceTitle.textContent = imageMode ? "图片素材" : "视频素材";
+    el.videoDropArt.hidden = imageMode;
+    el.imagesDropArt.hidden = !imageMode;
+    el.pickLabel.textContent = imageMode ? "选择图片" : "选择视频";
+    el.dropzone.setAttribute("aria-label", imageMode ? "选择或拖入多张图片" : "选择或拖入视频文件");
+    el.replaceLabel.textContent = imageMode ? "添加图片" : "更换视频";
+    el.replaceIconVideo.hidden = imageMode;
+    el.replaceIconImages.hidden = !imageMode;
+    el.replaceBtn.hidden = !ready;
+
+    el.editor.hidden = imageMode || !state.loaded;
+    el.imageEditor.hidden = !imageMode || state.images.length === 0;
+    el.dropzone.hidden = ready;
+
+    resetDropPrompt();
+    syncSettingsAvailability();
+  }
+
+  function setMode(mode) {
+    if (!mode || mode === state.mode || state.busy || state.loading) return;
+    if (mode !== "video" && mode !== "images") return;
+
+    if (isImageMode()) state.imageWidthPref = state.width;
+    else state.videoWidthPref = state.width;
+
+    stopImagePreview();
+    el.previewVideo.pause();
+    cancelAnimationFrame(playheadRaf);
+
+    state.mode = mode;
+    state.width = mode === "images" ? state.imageWidthPref : state.videoWidthPref;
+
+    clearDropError();
+    setSettingsError("");
+    updateModeControls();
+    updateSourceModeUi();
+    updateSettingsModeUi();
+    configureWidth();
+    updateSummary();
+
+    if (mode === "images") {
+      if (state.images.length) {
+        renderImageSequence();
+        updateImagePreview();
+      }
+    } else {
+      updatePlayhead();
+    }
+  }
+
+  function beginLoadingUi(hadVideo) {
+    clearDropError();
+    if (!hadVideo) {
+      el.dropzone.classList.add("is-loading");
+      el.dropzone.setAttribute("aria-busy", "true");
+      el.dropSpinner.hidden = false;
+      el.pickPill.hidden = true;
+      el.dropTitle.textContent = "正在读取视频…";
+      el.dropHint.textContent = "浏览器正在解码，请稍候";
+    } else {
+      el.replaceBtn.disabled = true;
+      el.replaceLabel.textContent = "读取中…";
+    }
+  }
+
+  function endLoadingUi(hadVideo) {
+    el.dropzone.classList.remove("is-loading");
+    el.dropzone.removeAttribute("aria-busy");
+    el.dropSpinner.hidden = true;
+    el.pickPill.hidden = false;
+    el.replaceBtn.disabled = false;
+    el.replaceLabel.textContent = "更换视频";
+    if (!hadVideo && !state.loaded) resetDropPrompt();
+  }
+
+  function clearHiddenVideo(video) {
+    video.pause();
+    video.removeAttribute("src");
+    video.dataset.sourceUrl = "";
+    try { video.load(); } catch (error) { /* ignore */ }
+  }
+
+  function clearResult() {
+    if (state.resultUrl) {
+      URL.revokeObjectURL(state.resultUrl);
+      state.resultUrl = null;
+    }
+    el.gifPreview.removeAttribute("src");
+    el.resultCard.hidden = true;
+    el.downloadBtn.setAttribute("href", "#");
+    el.downloadBtn.removeAttribute("download");
+  }
+
+
+  function loadImageElement(url, timeout) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      var settled = false;
+      var timer = null;
+
+      function cleanup() {
+        if (timer) window.clearTimeout(timer);
+        image.onload = null;
+        image.onerror = null;
+      }
+
+      function fail(message) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error(message));
+      }
+
+      image.onload = function () {
+        if (settled) return;
+        if (!image.naturalWidth || !image.naturalHeight) {
+          fail("图片尺寸无效。");
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve(image);
+      };
+
+      image.onerror = function () {
+        fail("图片解码失败。");
+      };
+
+      timer = window.setTimeout(function () {
+        fail("图片加载超时。");
+      }, timeout || 20000);
+
+      try {
+        image.src = url;
+      } catch (error) {
+        fail("图片加载失败。");
+      }
+    });
+  }
+
+  function fitImagePreviewFrame() {
+    if (!isImageMode() || !state.images.length) return;
+    var first = state.images[0];
+    var stageWidth = el.imageStage.clientWidth;
+    if (!stageWidth) return;
+
+    var compact = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+    var padding = compact ? 28 : 36;
+    var maxHeight = compact ? 270 : 340;
+    var availableWidth = Math.max(1, stageWidth - padding);
+    var scale = Math.min(availableWidth / first.width, maxHeight / first.height);
+
+    el.imagePreviewFrame.style.width = Math.max(1, Math.round(first.width * scale)) + "px";
+    el.imagePreviewFrame.style.height = Math.max(1, Math.round(first.height * scale)) + "px";
+  }
+
+  function updateImagePlayButton() {
+    var playGlyph = el.imagePlayBtn.querySelector(".play-glyph");
+    var stopGlyph = el.imagePlayBtn.querySelector(".stop-glyph");
+
+    el.imagePlayBtn.disabled = state.images.length < 2 || state.busy || state.loading;
+    el.imagePlayBtn.setAttribute("aria-pressed", String(state.previewPlaying));
+    el.imagePlayLabel.textContent = state.previewPlaying ? "停止预览" : "预览序列";
+    if (playGlyph) playGlyph.hidden = state.previewPlaying;
+    if (stopGlyph) stopGlyph.hidden = !state.previewPlaying;
+  }
+
+  function stopImagePreview() {
+    if (previewPlayTimer) {
+      window.clearTimeout(previewPlayTimer);
+      previewPlayTimer = 0;
+    }
+    state.previewPlaying = false;
+    updateImagePlayButton();
+  }
+
+  function advanceImagePreview() {
+    if (!state.previewPlaying) return;
+    if (state.images.length < 2) {
+      stopImagePreview();
+      return;
+    }
+
+    var current = getSelectedImageIndex();
+    if (current < 0) current = 0;
+    var next = current + 1;
+
+    if (next >= state.images.length) {
+      if (!state.loop) {
+        stopImagePreview();
+        return;
+      }
+      next = 0;
+    }
+
+    state.selectedImageId = state.images[next].id;
+    updateImagePreview();
+    previewPlayTimer = window.setTimeout(
+      advanceImagePreview,
+      Math.max(100, getImageDelayCs() * 10)
+    );
+  }
+
+  function toggleImagePreview() {
+    if (state.previewPlaying) {
+      stopImagePreview();
+      return;
+    }
+    if (!isImageMode() || state.images.length < 2 || state.busy || state.loading) return;
+
+    if (!state.loop && getSelectedImageIndex() === state.images.length - 1) {
+      state.selectedImageId = state.images[0].id;
+      updateImagePreview();
+    }
+
+    state.previewPlaying = true;
+    updateImagePlayButton();
+    previewPlayTimer = window.setTimeout(
+      advanceImagePreview,
+      Math.max(100, getImageDelayCs() * 10)
+    );
+  }
+
+  function updateImageSelectionClasses() {
+    var cards = el.imageList.querySelectorAll(".image-card");
+    for (var i = 0; i < cards.length; i++) {
+      var selected = cards[i].dataset.id === state.selectedImageId;
+      cards[i].classList.toggle("is-selected", selected);
+      var select = cards[i].querySelector(".image-select");
+      if (select) select.setAttribute("aria-pressed", String(selected));
+    }
+  }
+
+  function updateImagePreview() {
+    var item = getSelectedImage();
+
+    if (!item) {
+      el.imagePreview.removeAttribute("src");
+      el.imagePreviewName.textContent = "图片预览";
+      el.imagePreviewDetail.textContent = "—";
+      el.imagePreviewIndex.textContent = "0 / 0";
+      el.imageCountLabel.textContent = "0 张";
+      el.imageCanvasDims.textContent = "—";
+      el.clearImagesBtn.disabled = true;
+      updateImagePlayButton();
+      return;
+    }
+
+    if (state.selectedImageId !== item.id) state.selectedImageId = item.id;
+    var index = getSelectedImageIndex();
+
+    if (el.imagePreview.getAttribute("src") !== item.url) {
+      el.imagePreview.src = item.url;
+    }
+    el.imagePreview.alt = "预览：" + item.name;
+    el.imagePreviewName.textContent = item.name;
+    el.imagePreviewDetail.textContent = item.width + " × " + item.height + " · " + formatBytes(item.size);
+    el.imagePreviewIndex.textContent = (index >= 0 ? index + 1 : 1) + " / " + state.images.length;
+    el.imageCountLabel.textContent = state.images.length + " 张";
+    el.imageCanvasDims.textContent = state.width + " × " + state.height;
+    el.clearImagesBtn.disabled = state.busy || state.loading;
+
+    updateFitButtons();
+    updateImageSelectionClasses();
+    updateImagePlayButton();
+    window.requestAnimationFrame(fitImagePreviewFrame);
+  }
+
+  function imageActionButton(action, label, disabled) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.dataset.imageAction = action;
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.disabled = Boolean(disabled);
+    button.draggable = false;
+
+    var icons = {
+      left: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg>',
+      right: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg>',
+      remove: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 4.5h9M6.3 4.5V3h3.4v1.5M5 6.5v6M8 6.5v6M11 6.5v6M4.3 4.5l.5 9h6.4l.5-9"/></svg>'
+    };
+    button.innerHTML = icons[action];
+    return button;
+  }
+
+  function createImageCard(item, index) {
+    var card = document.createElement("div");
+    card.className = "image-card";
+    card.dataset.id = item.id;
+    card.draggable = true;
+
+    var select = document.createElement("button");
+    select.type = "button";
+    select.className = "image-select";
+    select.dataset.imageSelect = "true";
+    select.setAttribute("aria-label", "预览第 " + (index + 1) + " 张图片：" + item.name);
+    select.setAttribute("aria-pressed", String(item.id === state.selectedImageId));
+
+    var media = document.createElement("span");
+    media.className = "image-card-media";
+
+    var preview = document.createElement("img");
+    preview.src = item.url;
+    preview.alt = "";
+    preview.loading = "lazy";
+    preview.draggable = false;
+
+    var order = document.createElement("span");
+    order.className = "image-card-order";
+    order.textContent = pad2(index + 1);
+
+    var caption = document.createElement("span");
+    caption.className = "image-card-caption";
+    caption.textContent = item.name;
+    caption.title = item.name;
+
+    media.appendChild(preview);
+    media.appendChild(order);
+    select.appendChild(media);
+    select.appendChild(caption);
+
+    var actions = document.createElement("div");
+    actions.className = "image-card-actions";
+    actions.appendChild(imageActionButton("left", "将 " + item.name + " 前移", index === 0));
+    actions.appendChild(imageActionButton("right", "将 " + item.name + " 后移", index === state.images.length - 1));
+    actions.appendChild(imageActionButton("remove", "移除 " + item.name, false));
+
+    card.appendChild(select);
+    card.appendChild(actions);
+
+    if (item.id === state.selectedImageId) card.classList.add("is-selected");
+    return card;
+  }
+
+  function renderImageSequence() {
+    var previousScroll = el.imageList.scrollLeft;
+    var fragment = document.createDocumentFragment();
+
+    for (var i = 0; i < state.images.length; i++) {
+      fragment.appendChild(createImageCard(state.images[i], i));
+    }
+
+    var addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className = "image-add-card";
+    addButton.dataset.imageAdd = "true";
+    addButton.setAttribute("aria-label", "添加更多图片");
+    addButton.disabled = state.images.length >= MAX_IMAGES || state.loading || state.busy;
+    addButton.innerHTML = '<span class="add-plus" aria-hidden="true">+</span><span>添加图片</span>';
+
+    fragment.appendChild(addButton);
+    el.imageList.replaceChildren(fragment);
+    el.imageList.scrollLeft = previousScroll;
+
+    el.imageCountLabel.textContent = state.images.length + " 张";
+    el.clearImagesBtn.disabled = state.images.length === 0 || state.loading || state.busy;
+    updateImageSelectionClasses();
+  }
+
+  function refreshImageEditorState() {
+    if (!isImageMode()) return;
+
+    if (!state.images.length) {
+      state.selectedImageId = null;
+      stopImagePreview();
+      updateSourceModeUi();
+      configureWidth();
+      updateSummary();
+      syncSettingsAvailability();
+      return;
+    }
+
+    if (getSelectedImageIndex() < 0) state.selectedImageId = state.images[0].id;
+
+    updateSourceModeUi();
+    configureWidth();
+    renderImageSequence();
+    updateImagePreview();
+    updateSummary();
+    syncSettingsAvailability();
+  }
+
+  function scrollImageCardIntoView(id) {
+    var card = el.imageList.querySelector('.image-card[data-id="' + id + '"]');
+    if (!card) return;
+
+    var listRect = el.imageList.getBoundingClientRect();
+    var cardRect = card.getBoundingClientRect();
+
+    if (cardRect.left < listRect.left) {
+      el.imageList.scrollLeft -= (listRect.left - cardRect.left + 8);
+    } else if (cardRect.right > listRect.right) {
+      el.imageList.scrollLeft += (cardRect.right - listRect.right + 8);
+    }
+  }
+
+  function selectImage(id, options) {
+    var exists = false;
+    for (var i = 0; i < state.images.length; i++) {
+      if (state.images[i].id === id) {
+        exists = true;
+        break;
+      }
+    }
+    if (!exists) return;
+
+    if (state.selectedImageId !== id) {
+      if (!options || !options.fromPlayback) stopImagePreview();
+      state.selectedImageId = id;
+      updateImagePreview();
+    }
+
+    if (!options || !options.fromPlayback) scrollImageCardIntoView(id);
+  }
+
+  function moveImage(id, direction) {
+    if (state.busy || state.loading) return;
+
+    var index = -1;
+    for (var i = 0; i < state.images.length; i++) {
+      if (state.images[i].id === id) {
+        index = i;
+        break;
+      }
+    }
+    if (index < 0) return;
+
+    var target = index + direction;
+    if (target < 0 || target >= state.images.length) return;
+
+    stopImagePreview();
+    var item = state.images.splice(index, 1)[0];
+    state.images.splice(target, 0, item);
+    refreshImageEditorState();
+
+    var action = direction < 0 ? "left" : "right";
+    var button = el.imageList.querySelector('.image-card[data-id="' + id + '"] [data-image-action="' + action + '"]');
+    if (!button || button.disabled) {
+      button = el.imageList.querySelector('.image-card[data-id="' + id + '"] .image-select');
+    }
+    if (button) {
+      try { button.focus({ preventScroll: true }); } catch (error) { button.focus(); }
+      scrollImageCardIntoView(id);
+    }
+  }
+
+  function removeImage(id) {
+    if (state.busy || state.loading) return;
+
+    var index = -1;
+    for (var i = 0; i < state.images.length; i++) {
+      if (state.images[i].id === id) {
+        index = i;
+        break;
+      }
+    }
+    if (index < 0) return;
+
+    stopImagePreview();
+    var removed = state.images.splice(index, 1)[0];
+    URL.revokeObjectURL(removed.url);
+
+    if (!state.images.length) {
+      state.selectedImageId = null;
+      refreshImageEditorState();
+      el.dropzone.focus();
+      return;
+    }
+
+    if (getSelectedImageIndex() < 0) {
+      var nextItem = state.images[Math.min(index, state.images.length - 1)];
+      state.selectedImageId = nextItem.id;
+    }
+
+    refreshImageEditorState();
+
+    var nextCard = el.imageList.querySelector('.image-card[data-id="' + state.selectedImageId + '"]');
+    if (nextCard) {
+      var focusTarget = nextCard.querySelector(".image-select");
+      if (focusTarget) {
+        try { focusTarget.focus({ preventScroll: true }); } catch (error) { focusTarget.focus(); }
+        scrollImageCardIntoView(state.selectedImageId);
+      }
+    }
+  }
+
+  function clearImages() {
+    if (state.busy || state.loading || !state.images.length) return;
+    if (state.images.length > 1 && !window.confirm("确定清空全部 " + state.images.length + " 张图片吗？")) return;
+
+    stopImagePreview();
+    for (var i = 0; i < state.images.length; i++) {
+      URL.revokeObjectURL(state.images[i].url);
+    }
+    state.images = [];
+    state.selectedImageId = null;
+    clearDropError();
+    setSettingsError("");
+    refreshImageEditorState();
+    showToast("图片已清空。");
+    try { el.dropzone.focus({ preventScroll: true }); } catch (error) { el.dropzone.focus(); }
+  }
+
+  async function importImages(fileList) {
+    if (state.busy || state.loading || !isImageMode()) return;
+
+    var incoming = Array.prototype.slice.call(fileList || []);
+    var accepted = incoming.filter(looksLikeImage);
+    var ignored = incoming.length - accepted.length;
+
+    if (!accepted.length) {
+      var rejectMessage = "请选择静态图片：JPG、PNG、WebP、AVIF 或 BMP。";
+      if (state.images.length) {
+        showToast(rejectMessage, "error");
+      } else {
+        clearDropError();
+        showDropError(rejectMessage);
+        el.dropTitle.textContent = "换几张图片试试";
+        el.dropHint.textContent = "支持 JPG / PNG / WebP / AVIF / BMP，可多选";
+      }
+      return;
+    }
+
+    var room = MAX_IMAGES - state.images.length;
+    if (room <= 0) {
+      showToast("最多支持 " + MAX_IMAGES + " 张图片。", "error");
+      return;
+    }
+
+    var truncated = accepted.length > room;
+    if (truncated) accepted = accepted.slice(0, room);
+
+    var hadImages = state.images.length > 0;
+    state.loading = true;
+    stopImagePreview();
+    setModeTabsDisabled(true);
+    syncSettingsAvailability();
+    updateSummary();
+    updateImagePlayButton();
+
+    el.replaceBtn.disabled = true;
+    el.replaceLabel.textContent = "读取中…";
+    el.generateBtn.disabled = true;
+    el.imageEditor.classList.add("is-importing");
+
+    if (!hadImages) {
+      clearDropError();
+      el.dropzone.hidden = false;
+      el.imageEditor.hidden = true;
+      el.dropzone.classList.add("is-loading");
+      el.dropzone.setAttribute("aria-busy", "true");
+      el.dropSpinner.hidden = false;
+      el.pickPill.hidden = true;
+      el.dropTitle.textContent = "正在读取图片…";
+      el.dropHint.textContent = "准备读取 " + accepted.length + " 张图片";
+    }
+
+    var added = [];
+    var failed = ignored;
+    var fatalMessage = "";
+
+    try {
+      for (var index = 0; index < accepted.length; index++) {
+        var file = accepted[index];
+        if (!hadImages) {
+          el.dropHint.textContent = "正在读取第 " + (index + 1) + " / " + accepted.length + " 张…";
+        }
+
+        var url = "";
+        try {
+          url = URL.createObjectURL(file);
+          var image = await loadImageElement(url, 20000);
+          added.push({
+            id: "image-" + (++imageIdSeed),
+            file: file,
+            url: url,
+            name: file.name || "图片",
+            size: file.size || 0,
+            width: image.naturalWidth,
+            height: image.naturalHeight
+          });
+        } catch (error) {
+          if (url) URL.revokeObjectURL(url);
+          failed++;
+        }
+
+        await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
+      }
+    } catch (error) {
+      fatalMessage = (error && error.message) || "图片读取失败。";
+    } finally {
+      state.loading = false;
+      setModeTabsDisabled(false);
+      el.dropzone.classList.remove("is-loading");
+      el.dropzone.removeAttribute("aria-busy");
+      el.dropSpinner.hidden = true;
+      el.pickPill.hidden = false;
+      el.imageEditor.classList.remove("is-importing");
+      el.replaceBtn.disabled = false;
+      el.replaceLabel.textContent = isImageMode() ? "添加图片" : "更换视频";
+    }
+
+    if (added.length) {
+      state.images = state.images.concat(added);
+      state.selectedImageId = added[0].id;
+      refreshImageEditorState();
+      updateImagePlayButton();
+
+      var message = "已添加 " + added.length + " 张图片。";
+      if (failed > 0) message = "已添加 " + added.length + " 张，另有 " + failed + " 个文件未读取。";
+      if (truncated) message += " 最多支持 " + MAX_IMAGES + " 张图片。";
+      showToast(message);
+      return;
+    }
+
+    if (!hadImages) {
+      updateSourceModeUi();
+      resetDropPrompt();
+      el.dropTitle.textContent = "再试一次";
+      el.dropHint.textContent = "支持 JPG / PNG / WebP / AVIF / BMP";
+      showDropError(fatalMessage || "所选图片无法读取，请换几张试试。");
+      updateSummary();
+      syncSettingsAvailability();
+    } else {
+      refreshImageEditorState();
+      showToast(fatalMessage || "图片读取失败，已保留原有图片。", "error");
+    }
+  }
+
+  function probeVideoFile(url) {
+    return new Promise(function (resolve, reject) {
+      var probe = document.createElement("video");
+      probe.preload = "auto";
+      probe.muted = true;
+      probe.playsInline = true;
+      probe.setAttribute("playsinline", "");
+      probe.setAttribute("aria-hidden", "true");
+      probe.style.cssText = "position:fixed;left:-10000px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;";
+      document.body.appendChild(probe);
+
+      var settled = false;
+      var timeoutId = null;
+      var durationTimeoutId = null;
+
+      function cleanup() {
+        if (timeoutId) window.clearTimeout(timeoutId);
+        if (durationTimeoutId) window.clearTimeout(durationTimeoutId);
+        probe.removeEventListener("loadeddata", onLoadedData);
+        probe.removeEventListener("durationchange", onDurationChange);
+        probe.removeEventListener("error", onError);
+        if (probe.parentNode) probe.parentNode.removeChild(probe);
+        probe.removeAttribute("src");
+        try { probe.load(); } catch (error) { /* ignore */ }
+      }
+
+      function fail(message) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error(message));
+      }
+
+      function succeed() {
+        if (settled) return;
+        var duration = probe.duration;
+        var width = probe.videoWidth;
+        var height = probe.videoHeight;
+
+        if (!Number.isFinite(duration) || duration <= 0) {
+          fail("无法读取视频时长。请换用 MP4 (H.264) 或 WebM 文件。");
+          return;
+        }
+        if (!width || !height) {
+          fail("无法读取视频画面尺寸，请尝试其他视频文件。");
+          return;
+        }
+
+        settled = true;
+        cleanup();
+        resolve({ duration: duration, width: width, height: height });
+      }
+
+      function onLoadedData() {
+        if (Number.isFinite(probe.duration) && probe.duration > 0) {
+          succeed();
+          return;
+        }
+        probe.addEventListener("durationchange", onDurationChange);
+        durationTimeoutId = window.setTimeout(function () {
+          if (Number.isFinite(probe.duration) && probe.duration > 0) succeed();
+          else fail("视频缺少可读取的时长信息，请先转换为标准 MP4 或 WebM。");
+        }, 1200);
+      }
+
+      function onDurationChange() {
+        if (Number.isFinite(probe.duration) && probe.duration > 0) succeed();
+      }
+
+      function onError() {
+        fail("当前浏览器无法解码这个视频，请尝试 MP4 (H.264) 或 WebM 格式。");
+      }
+
+      timeoutId = window.setTimeout(function () {
+        fail("读取视频超时，请检查文件是否损坏，或换一个视频试试。");
+      }, 20000);
+
+      probe.addEventListener("loadeddata", onLoadedData);
+      probe.addEventListener("error", onError);
+      probe.src = url;
+      probe.load();
+    });
+  }
+
+  async function openFile(file) {
+    if (!file || state.loading || state.busy) return;
+
+    if (!looksLikeVideo(file)) {
+      var invalidMessage = "这不是一个可识别的视频文件，请选择 MP4、WebM 或 MOV。";
+      if (state.loaded) showToast(invalidMessage, "error");
+      else {
+        clearDropError();
+        showDropError(invalidMessage);
+        el.dropTitle.textContent = "换一个视频试试";
+        el.dropHint.textContent = "拖入或点击选择视频文件";
+      }
+      return;
+    }
+
+    var hadVideo = state.loaded;
+    var token = ++loadToken;
+    state.loading = true;
+    setModeTabsDisabled(true);
+    beginLoadingUi(hadVideo);
+    el.settingsFieldset.disabled = true;
+    el.generateBtn.disabled = true;
+    el.timeline.classList.add("is-disabled");
+
+    var url = "";
+    try {
+      url = URL.createObjectURL(file);
+      var meta = await probeVideoFile(url);
+      if (token !== loadToken) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      commitVideo(file, url, meta, hadVideo);
+    } catch (error) {
+      if (url) URL.revokeObjectURL(url);
+      state.loading = false;
+      endLoadingUi(hadVideo);
+
+      if (!hadVideo) {
+        showDropError((error && error.message) || "无法读取这个视频，请换一个文件试试。");
+        el.dropTitle.textContent = "再试一次";
+        el.dropHint.textContent = "拖入或点击选择另一个视频";
+      } else {
+        el.settingsFieldset.disabled = false;
+        el.timeline.classList.remove("is-disabled");
+        updateSummary();
+        showToast((error && error.message) || "无法读取新视频，已保留当前素材", "error");
+      }
+    } finally {
+      state.loading = false;
+      setModeTabsDisabled(false);
+    }
+  }
+
+  function commitVideo(file, url, meta, hadVideo) {
+    el.previewVideo.pause();
+    try {
+      el.previewVideo.removeAttribute("src");
+      el.previewVideo.load();
+    } catch (error) { /* ignore */ }
+
+    filmstripToken++;
+    clearHiddenVideo(filmVideo);
+    clearHiddenVideo(captureVideo);
+    clearResult();
+
+    if (state.url) URL.revokeObjectURL(state.url);
+
+    state.url = url;
+    state.file = file;
+    state.duration = meta.duration;
+    state.videoWidth = meta.width;
+    state.videoHeight = meta.height;
+    state.trimStart = 0;
+    state.trimEnd = Math.min(meta.duration, DEFAULT_CLIP_SECONDS);
+    state.loaded = true;
+    state.loading = false;
+
+    configureWidth();
+
+    el.fileName.textContent = file.name;
+    el.fileName.title = file.name;
+    el.fileMeta.textContent = [
+      formatFileKind(file),
+      formatBytes(file.size),
+      meta.width + " × " + meta.height,
+      formatTime(meta.duration)
+    ].join("  ·  ");
+
+    el.previewVideo.src = url;
+    el.previewVideo.load();
+    el.previewVideo.controls = true;
+
+    el.dropzone.hidden = true;
+    el.editor.hidden = false;
+    el.replaceBtn.hidden = false;
+    el.replaceBtn.disabled = false;
+    el.replaceLabel.textContent = "更换视频";
+
+    el.settingsFieldset.disabled = false;
+    el.timeline.classList.remove("is-disabled");
+    el.generateLabel.textContent = "生成 GIF";
+    setSettingsError("");
+    clearDropError();
+    endLoadingUi(hadVideo);
+    resetDropPrompt();
+
+    renderFilmstripPlaceholders();
+    updateFpsButtons();
+    updateColorButtons();
+    updateSelectionUi();
+    updatePlayhead();
+    updateSummary();
+
+    buildFilmstrip(url);
+
+    if (meta.duration > DEFAULT_CLIP_SECONDS + 0.05) {
+      showToast("视频较长，已默认截取前 10 秒。拖动把手可调整范围。");
+    }
+  }
+
+  function syncActiveWidthPref() {
+    if (isImageMode()) state.imageWidthPref = state.width;
+    else state.videoWidthPref = state.width;
+  }
+
+  function configureWidth() {
+    var source = getActiveSourceSize();
+    var preferred = Math.round(state.width || 480);
+
+    if (!source) {
+      state.height = 0;
+      el.widthRange.min = "120";
+      el.widthRange.max = "960";
+      el.widthRange.step = "1";
+      el.widthRange.value = String(preferred);
+      el.sourceDimensions.textContent = isImageMode() ? "画布比例取自第一张" : "保持原始比例";
+      updateWidthUi();
+      return;
+    }
+
+    var maxWidth = Math.max(2, Math.min(960, Math.round(source.width)));
+    var minWidth = Math.min(120, maxWidth);
+
+    state.width = clamp(preferred, minWidth, maxWidth);
+    state.height = Math.max(1, Math.round(source.height * state.width / source.width));
+
+    el.widthRange.min = String(minWidth);
+    el.widthRange.max = String(maxWidth);
+    el.widthRange.step = "1";
+    el.widthRange.value = String(state.width);
+    el.sourceDimensions.textContent = isImageMode()
+      ? "第一张 " + source.width + " × " + source.height
+      : "原始 " + source.width + " × " + source.height;
+
+    syncActiveWidthPref();
+    updateWidthUi();
+  }
+
+  function updateWidthUi() {
+    var source = getActiveSourceSize();
+
+    if (!source) {
+      el.widthOutput.textContent = "—";
+      el.outputDimensions.textContent = "—";
+      el.widthRange.style.setProperty("--range-p", "50%");
+      if (el.imageCanvasDims) el.imageCanvasDims.textContent = "—";
+      return;
+    }
+
+    state.height = Math.max(1, Math.round(source.height * state.width / source.width));
+    el.widthOutput.textContent = state.width + " px";
+    el.outputDimensions.textContent = state.width + " × " + state.height;
+    if (isImageMode() && el.imageCanvasDims) {
+      el.imageCanvasDims.textContent = state.width + " × " + state.height;
+    }
+
+    var min = Number(el.widthRange.min) || 0;
+    var max = Number(el.widthRange.max) || min;
+    var percent = max === min ? 100 : ((state.width - min) / (max - min)) * 100;
+    el.widthRange.style.setProperty("--range-p", clamp(percent, 0, 100).toFixed(2) + "%");
+  }
+
+  function updateFpsButtons() {
+    var buttons = el.fpsGroup.querySelectorAll("button[data-fps]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute("aria-pressed", String(Number(buttons[i].dataset.fps) === state.fps));
+    }
+  }
+
+  function updateColorButtons() {
+    var buttons = el.colorGroup.querySelectorAll("button[data-colors]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute("aria-pressed", String(Number(buttons[i].dataset.colors) === state.colors));
+    }
+  }
+
+  function updateImageTimingUi() {
+    var seconds = clamp(state.imageDuration, 0.1, 5);
+    var count = state.images.length;
+    var total = count * getImageDelayCs() / 100;
+
+    el.imageDurationOutput.textContent = seconds.toFixed(1) + " 秒 / 张";
+    el.imageDurationRange.value = String(Math.round(seconds * 100));
+    el.imageDurationTotal.textContent = count ? "共 " + total.toFixed(1) + " 秒" : "—";
+
+    var min = Number(el.imageDurationRange.min) || 10;
+    var max = Number(el.imageDurationRange.max) || 500;
+    var percent = max === min ? 100 : ((seconds * 100 - min) / (max - min)) * 100;
+    el.imageDurationRange.style.setProperty("--range-p", clamp(percent, 0, 100).toFixed(2) + "%");
+    el.imageDurationRange.style.setProperty("--range-fill", clamp(percent, 0, 100).toFixed(2) + "%");
+  }
+
+  function updateFitButtons() {
+    var buttons = el.imageFitGroup.querySelectorAll("button[data-fit]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute("aria-pressed", String(buttons[i].dataset.fit === state.imageFit));
+    }
+    el.imageBackgroundValue.textContent = state.imageBackground.toUpperCase();
+    el.imageBackgroundInput.value = state.imageBackground;
+    if (el.imagePreviewFrame) el.imagePreviewFrame.style.backgroundColor = state.imageBackground;
+    if (el.imagePreview) el.imagePreview.style.objectFit = state.imageFit === "cover" ? "cover" : "contain";
+    el.imageBackgroundNote.textContent = state.imageFit === "cover"
+      ? "仅在图片含透明区域时可见"
+      : "完整显示时的空白区域";
+  }
+
+  function getFramePlan() {
+    var range = Math.max(0, state.trimEnd - state.trimStart);
+    var count = Math.max(1, Math.round(range * state.fps));
+    return {
+      range: range,
+      frameCount: count,
+      overLimit: count > MAX_FRAMES
+    };
+  }
+
+  function updateSummary() {
+    var ready = hasActiveSource();
+    updateImageTimingUi();
+
+    if (!ready) {
+      el.estimateFramesLabel.textContent = isImageMode() ? "图片张数" : "预计帧数";
+      el.estimateFrames.textContent = "—";
+      el.estimateSize.textContent = "—";
+      el.limitHint.hidden = true;
+      el.generateBtn.disabled = true;
+      return;
+    }
+
+    if (isImageMode()) {
+      var imagePlan = getImagePlan();
+      el.estimateFramesLabel.textContent = "图片张数";
+      el.estimateFrames.textContent = imagePlan.frameCount + " 张";
+      el.estimateSize.textContent = state.width + " × " + state.height;
+
+      var imageLimitMessage = "";
+      if (imagePlan.tooFew) imageLimitMessage = "至少添加 2 张图片，才能生成 GIF。";
+      else if (imagePlan.overLimit) imageLimitMessage = "图片数量超过单次 " + MAX_FRAMES + " 张上限。";
+
+      el.limitHint.hidden = !imageLimitMessage;
+      if (imageLimitMessage) el.limitHint.textContent = imageLimitMessage;
+
+      el.generateBtn.disabled = state.busy || state.loading || imagePlan.tooFew || imagePlan.overLimit;
+      return;
+    }
+
+    var plan = getFramePlan();
+    el.estimateFramesLabel.textContent = "预计帧数";
+    el.estimateFrames.textContent = plan.frameCount + " 帧";
+    el.estimateSize.textContent = state.width + " × " + state.height;
+    el.trimDuration.textContent = plan.range >= 60
+      ? formatTime(plan.range)
+      : plan.range.toFixed(1) + " 秒";
+
+    el.limitHint.hidden = !plan.overLimit;
+    if (plan.overLimit) {
+      el.limitHint.textContent = "当前选区约 " + plan.frameCount + " 帧，超过单次 " + MAX_FRAMES + " 帧上限。请缩短片段或降低帧率。";
+    }
+
+    el.generateBtn.disabled = state.busy || state.loading || plan.overLimit || !state.loaded;
+  }
+
+  function updateSelectionUi() {
+    if (!state.loaded || !state.duration) return;
+
+    var startPercent = clamp((state.trimStart / state.duration) * 100, 0, 100);
+    var endPercent = clamp((state.trimEnd / state.duration) * 100, 0, 100);
+
+    el.trimSelection.style.left = startPercent.toFixed(4) + "%";
+    el.trimSelection.style.width = Math.max(0, endPercent - startPercent).toFixed(4) + "%";
+    el.shadeLeft.style.width = startPercent.toFixed(4) + "%";
+    el.shadeRight.style.width = Math.max(0, 100 - endPercent).toFixed(4) + "%";
+    el.startHandle.style.left = startPercent.toFixed(4) + "%";
+    el.endHandle.style.left = endPercent.toFixed(4) + "%";
+
+    el.startHandle.setAttribute("aria-valuemin", "0");
+    el.startHandle.setAttribute("aria-valuemax", state.duration.toFixed(2));
+    el.startHandle.setAttribute("aria-valuenow", state.trimStart.toFixed(2));
+    el.startHandle.setAttribute("aria-valuetext", formatTime(state.trimStart));
+
+    el.endHandle.setAttribute("aria-valuemin", "0");
+    el.endHandle.setAttribute("aria-valuemax", state.duration.toFixed(2));
+    el.endHandle.setAttribute("aria-valuenow", state.trimEnd.toFixed(2));
+    el.endHandle.setAttribute("aria-valuetext", formatTime(state.trimEnd));
+
+    el.startLabel.textContent = formatTime(state.trimStart);
+    el.endLabel.textContent = formatTime(state.trimEnd);
+    el.clipDuration.textContent = formatTime(state.trimEnd - state.trimStart);
+
+    updateSummary();
+  }
+
+  function minimumTrimGap() {
+    return Math.max(0.001, Math.min(MIN_TRIM_GAP, state.duration / 2));
+  }
+
+  function setTrimBoundary(boundary, value, seekPreview) {
+    if (!state.loaded) return;
+
+    var gap = minimumTrimGap();
+    var next = Math.round(clamp(value, 0, state.duration) * 100) / 100;
+
+    if (boundary === "start") {
+      state.trimStart = clamp(next, 0, Math.max(0, state.trimEnd - gap));
+    } else {
+      state.trimEnd = clamp(next, Math.min(state.duration, state.trimStart + gap), state.duration);
+    }
+
+    updateSelectionUi();
+
+    if (seekPreview) {
+      el.previewVideo.pause();
+      try {
+        el.previewVideo.currentTime = clamp(
+          boundary === "start" ? state.trimStart : state.trimEnd,
+          0,
+          Math.max(0, state.duration - 0.01)
+        );
+      } catch (error) { /* ignore */ }
+      updatePlayhead();
+    }
+  }
+
+  function seekPreview(time) {
+    if (!state.loaded) return;
+    try {
+      el.previewVideo.currentTime = clamp(time, 0, Math.max(0, state.duration - 0.01));
+    } catch (error) { /* ignore */ }
+    updatePlayhead();
+  }
+
+  function updatePlayhead() {
+    if (!state.loaded || !state.duration) {
+      el.playhead.style.left = "0%";
+      return;
+    }
+    var percent = clamp(el.previewVideo.currentTime / state.duration, 0, 1) * 100;
+    el.playhead.style.left = percent.toFixed(3) + "%";
+  }
+
+  function startPlayheadLoop() {
+    cancelAnimationFrame(playheadRaf);
+    function tick() {
+      updatePlayhead();
+      if (!el.previewVideo.paused && !el.previewVideo.ended) {
+        playheadRaf = requestAnimationFrame(tick);
+      }
+    }
+    playheadRaf = requestAnimationFrame(tick);
+  }
+
+  function timeFromPointer(event) {
+    var rect = el.timeline.getBoundingClientRect();
+    if (!rect.width) return 0;
+    var ratio = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+    return ratio * state.duration;
+  }
+
+  function endTimelineDrag() {
+    if (!timelineDrag) return;
+    if (timelineDrag.handle) timelineDrag.handle.classList.remove("is-dragging");
+    try {
+      if (el.timeline.hasPointerCapture(timelineDrag.pointerId)) {
+        el.timeline.releasePointerCapture(timelineDrag.pointerId);
+      }
+    } catch (error) { /* ignore */ }
+    timelineDrag = null;
+  }
+
+  function renderFilmstripPlaceholders() {
+    var fragment = document.createDocumentFragment();
+    filmTiles = [];
+    for (var i = 0; i < 10; i++) {
+      var tile = document.createElement("span");
+      tile.className = "film-thumb";
+      fragment.appendChild(tile);
+      filmTiles.push(tile);
+    }
+    el.filmstrip.replaceChildren(fragment);
+  }
+
+  function loadVideoSource(video, url, timeout) {
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var timer = null;
+
+      function cleanup() {
+        if (timer) window.clearTimeout(timer);
+        video.removeEventListener("loadeddata", onReady);
+        video.removeEventListener("error", onError);
+      }
+
+      function fail(message) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error(message));
+      }
+
+      function onReady() {
+        if (settled) return;
+        if (video.readyState < 2) return;
+        settled = true;
+        cleanup();
+        resolve();
+      }
+
+      function onError() {
+        fail("无法解码视频画面。");
+      }
+
+      video.pause();
+      video.addEventListener("loadeddata", onReady);
+      video.addEventListener("error", onError);
+      timer = window.setTimeout(function () {
+        fail("视频加载超时，请尝试较短的视频或换一个文件。");
+      }, timeout || 20000);
+
+      try {
+        video.src = url;
+        video.load();
+      } catch (error) {
+        fail("无法加载视频画面。");
+      }
+    });
+  }
+
+  function waitForVideoReady(video, timeout) {
+    return new Promise(function (resolve, reject) {
+      if (video.readyState >= 2) {
+        resolve();
+        return;
+      }
+
+      var settled = false;
+      var timer = null;
+
+      function cleanup() {
+        if (timer) window.clearTimeout(timer);
+        video.removeEventListener("loadeddata", onReady);
+        video.removeEventListener("error", onError);
+      }
+
+      function onReady() {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      }
+
+      function onError() {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error("无法解码视频画面。"));
+      }
+
+      video.addEventListener("loadeddata", onReady);
+      video.addEventListener("error", onError);
+      timer = window.setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error("视频加载超时，请尝试较短的视频或换一个文件。"));
+      }, timeout || 20000);
+    });
+  }
+
+  async function prepareVideo(video, url, timeout) {
+    if (video.dataset.sourceUrl !== url || !video.currentSrc) {
+      await loadVideoSource(video, url, timeout);
+      video.dataset.sourceUrl = url;
+    } else if (video.readyState < 2) {
+      await waitForVideoReady(video, timeout);
+    }
+
+    video.pause();
+    if (!video.videoWidth || !video.videoHeight) {
+      throw new Error("无法读取视频画面尺寸。");
+    }
+  }
+
+  function seekVideoElement(video, time, timeout) {
+    return new Promise(function (resolve, reject) {
+      var duration = Number.isFinite(video.duration) && video.duration > 0
+        ? video.duration
+        : state.duration;
+      var target = clamp(time, 0, Math.max(0, duration - 0.001));
+
+      if (video.readyState >= 2 && Math.abs(video.currentTime - target) < 0.003) {
+        resolve();
+        return;
+      }
+
+      var settled = false;
+      var timer = null;
+
+      function cleanup() {
+        if (timer) window.clearTimeout(timer);
+        video.removeEventListener("seeked", onSeeked);
+        video.removeEventListener("error", onError);
+      }
+
+      function finish(error) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (error) reject(error);
+        else resolve();
+      }
+
+      function onSeeked() { finish(null); }
+      function onError() { finish(new Error("视频定位失败，请缩短片段或更换视频。")); }
+
+      video.addEventListener("seeked", onSeeked);
+      video.addEventListener("error", onError);
+      timer = window.setTimeout(function () {
+        finish(new Error("视频定位超时，请尝试缩短片段或更换视频。"));
+      }, timeout || 12000);
+
+      try {
+        video.currentTime = target;
+      } catch (error) {
+        finish(new Error("无法定位视频画面。"));
+      }
+    });
+  }
+
+  async function buildFilmstrip(url) {
+    var token = ++filmstripToken;
+
+    try {
+      await prepareVideo(filmVideo, url, 20000);
+    } catch (error) {
+      return;
+    }
+    if (token !== filmstripToken) return;
+
+    var sampleWidth = 160;
+    var sampleHeight = Math.max(2, Math.round(sampleWidth * state.videoHeight / state.videoWidth));
+    var canvas = document.createElement("canvas");
+    canvas.width = sampleWidth;
+    canvas.height = sampleHeight;
+    var context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!context) return;
+
+    var count = filmTiles.length || 10;
+    for (var i = 0; i < count; i++) {
+      if (token !== filmstripToken) return;
+
+      var time = state.duration * (i + 0.5) / count;
+      try {
+        await seekVideoElement(filmVideo, time, 7000);
+      } catch (error) {
+        continue;
+      }
+      if (token !== filmstripToken) return;
+
+      context.fillStyle = "#11130f";
+      context.fillRect(0, 0, sampleWidth, sampleHeight);
+      context.drawImage(filmVideo, 0, 0, sampleWidth, sampleHeight);
+
+      var dataUrl;
+      try {
+        dataUrl = canvas.toDataURL("image/jpeg", 0.58);
+      } catch (error) {
+        continue;
+      }
+
+      var tile = filmTiles[i];
+      if (tile) {
+        tile.style.backgroundImage = 'url("' + dataUrl + '")';
+        tile.classList.add("has-image");
+      }
+    }
+  }
+
+  function setProgress(percent, stage, framesText) {
+    var value = clamp(Math.round(percent), 0, 100);
+    el.progressBar.style.width = value + "%";
+    el.progressValue.textContent = value + "%";
+    el.progressTrack.setAttribute("aria-valuenow", String(value));
+    if (typeof stage === "string") el.progressStage.textContent = stage;
+    if (typeof framesText === "string") el.framesProgress.textContent = framesText;
+  }
+
+  function beginBusyUi() {
+    state.busy = true;
+    state.cancelRequested = false;
+    document.body.classList.add("is-busy");
+    stopImagePreview();
+    setModeTabsDisabled(true);
+    el.previewVideo.pause();
+    if (!isImageMode()) el.previewVideo.controls = false;
+    el.settingsFieldset.disabled = true;
+    el.replaceBtn.disabled = true;
+    el.timeline.classList.add("is-disabled");
+    el.generateBtn.hidden = true;
+    el.progressPanel.hidden = false;
+    el.cancelBtn.disabled = false;
+    el.cancelBtn.textContent = "取消";
+    el.clearImagesBtn.disabled = true;
+    setSettingsError("");
+
+    filmstripToken++;
+    filmVideo.pause();
+
+    setProgress(0, isImageMode() ? "准备图片编码…" : "准备视频解码器…", "0 / 0 帧");
+  }
+
+  function endBusyUi() {
+    state.busy = false;
+    state.cancelRequested = false;
+    document.body.classList.remove("is-busy");
+    setModeTabsDisabled(false);
+    el.previewVideo.controls = true;
+    el.settingsFieldset.disabled = !hasActiveSource();
+    el.replaceBtn.disabled = false;
+    el.replaceLabel.textContent = isImageMode() ? "添加图片" : "更换视频";
+    el.timeline.classList.remove("is-disabled");
+    el.generateBtn.hidden = false;
+    el.progressPanel.hidden = true;
+    el.cancelBtn.disabled = false;
+    el.cancelBtn.textContent = "取消";
+    el.clearImagesBtn.disabled = !state.images.length || state.loading;
+    setProgress(0, "准备中…", "—");
+    updateImagePlayButton();
+    updateSummary();
+  }
+
+  function throwIfCancelled() {
+    if (state.cancelRequested) {
+      var error = new Error("已取消生成");
+      error.name = "AbortError";
+      throw error;
+    }
+  }
+
+  function buildDelays(frameCount, fps) {
+    var delays = new Uint16Array(frameCount);
+    for (var i = 0; i < frameCount; i++) {
+      var current = Math.round(((i + 1) * 100) / fps);
+      var previous = Math.round((i * 100) / fps);
+      delays[i] = Math.max(1, current - previous);
+    }
+    return delays;
+  }
+
+  async function collectPalette(params, plan, sampleCount) {
+    var sampleWidth = Math.min(170, Math.max(2, params.width));
+    var sampleHeight = Math.max(2, Math.round(sampleWidth * params.height / params.width));
+    var canvas = document.createElement("canvas");
+    canvas.width = sampleWidth;
+    canvas.height = sampleHeight;
+    var context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+    var samples = [];
+
+    for (var i = 0; i < sampleCount; i++) {
+      throwIfCancelled();
+
+      var ratio = (i + 0.5) / sampleCount;
+      var time = params.start + plan.range * ratio;
+      setProgress(
+        2 + (i / sampleCount) * 7,
+        "分析画面色彩 " + (i + 1) + " / " + sampleCount + "…",
+        "准备共享调色板"
+      );
+
+      try {
+        await seekVideoElement(captureVideo, time, 12000);
+      } catch (error) {
+        continue;
+      }
+
+      throwIfCancelled();
+
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, sampleWidth, sampleHeight);
+      context.drawImage(captureVideo, 0, 0, sampleWidth, sampleHeight);
+
+      try {
+        var frame = context.getImageData(0, 0, sampleWidth, sampleHeight);
+        samples.push(frame.data);
+      } catch (error) {
+        // A single unreadable sample should not abort the whole export.
+      }
+    }
+
+    if (!samples.length) {
+      throw new Error("无法读取视频画面，请尝试其他格式或缩短片段。");
+    }
+
+    setProgress(9, "构建共享调色板…", "正在为整个片段配色");
+    await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
+    throwIfCancelled();
+
+    return Core.createPalette(samples, params.colors);
+  }
+
+  function drawImageFitted(context, image, width, height, fit, background) {
+    context.fillStyle = background || "#000000";
+    context.fillRect(0, 0, width, height);
+
+    var sourceWidth = image.naturalWidth || image.width;
+    var sourceHeight = image.naturalHeight || image.height;
+    if (!sourceWidth || !sourceHeight) return;
+
+    var scale = fit === "cover"
+      ? Math.max(width / sourceWidth, height / sourceHeight)
+      : Math.min(width / sourceWidth, height / sourceHeight);
+    var drawWidth = sourceWidth * scale;
+    var drawHeight = sourceHeight * scale;
+    var x = (width - drawWidth) / 2;
+    var y = (height - drawHeight) / 2;
+
+    context.drawImage(image, x, y, drawWidth, drawHeight);
+  }
+
+  async function generateImageGif() {
+    if (state.busy || state.loading) return;
+    if (state.images.length < 2) {
+      showToast("至少需要 2 张图片才能生成 GIF。", "error");
+      return;
+    }
+
+    var plan = getImagePlan();
+    if (plan.overLimit) {
+      showToast("图片超过 " + MAX_IMAGES + " 张上限。", "error");
+      return;
+    }
+
+    var items = state.images.slice();
+    var params = {
+      mode: "images",
+      width: state.width,
+      height: state.height,
+      colors: state.colors,
+      dither: state.dither,
+      loop: state.loop,
+      fit: state.imageFit,
+      background: state.imageBackground,
+      imageDuration: plan.delayCs / 100,
+      delayCs: plan.delayCs,
+      frameCount: items.length
+    };
+
+    beginBusyUi();
+    el.framesProgress.textContent = "0 / " + params.frameCount + " 张";
+
+    try {
+      setProgress(1, "准备图片编码器…", "0 / " + params.frameCount + " 张");
+
+      var sampleWidth = Math.min(170, Math.max(2, params.width));
+      var sampleHeight = Math.max(2, Math.round(sampleWidth * params.height / params.width));
+      var sampleCanvas = document.createElement("canvas");
+      sampleCanvas.width = sampleWidth;
+      sampleCanvas.height = sampleHeight;
+      var sampleContext = sampleCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+      if (!sampleContext) throw new Error("当前浏览器无法创建画布。");
+
+      sampleContext.imageSmoothingEnabled = true;
+      sampleContext.imageSmoothingQuality = "high";
+
+      var sampleCount = Math.min(12, items.length);
+      var samples = [];
+
+      for (var sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+        throwIfCancelled();
+
+        var itemIndex = sampleCount === 1
+          ? 0
+          : Math.round(sampleIndex * (items.length - 1) / (sampleCount - 1));
+        var sampleItem = items[itemIndex];
+
+        setProgress(
+          2 + (sampleIndex / sampleCount) * 7,
+          "分析图片色彩 " + (sampleIndex + 1) + " / " + sampleCount + "…",
+          "准备共享调色板"
+        );
+
+        var sampleImage;
+        try {
+          sampleImage = await loadImageElement(sampleItem.url, 20000);
+        } catch (error) {
+          continue;
+        }
+
+        throwIfCancelled();
+        drawImageFitted(
+          sampleContext,
+          sampleImage,
+          sampleWidth,
+          sampleHeight,
+          params.fit,
+          params.background
+        );
+
+        try {
+          var sampleData = sampleContext.getImageData(0, 0, sampleWidth, sampleHeight);
+          samples.push(sampleData.data);
+        } catch (error) {
+          // Continue with the remaining samples.
+        }
+      }
+
+      if (!samples.length) {
+        throw new Error("无法读取图片画面，请换几张图片试试。");
+      }
+
+      setProgress(9, "构建共享调色板…", "正在为整组图片配色");
+      await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
+      throwIfCancelled();
+
+      var palette = Core.createPalette(samples, params.colors);
+      var quantizer = Core.createQuantizer(palette);
+      var encoder = Core.createGifEncoder(params.width, params.height, quantizer.palette, {
+        loop: params.loop
+      });
+
+      var canvas = document.createElement("canvas");
+      canvas.width = params.width;
+      canvas.height = params.height;
+      var context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+      if (!context) throw new Error("当前浏览器无法创建画布。");
+
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+
+      for (var frameIndex = 0; frameIndex < items.length; frameIndex++) {
+        throwIfCancelled();
+        var frameItem = items[frameIndex];
+
+        setProgress(
+          10 + (frameIndex / items.length) * 87,
+          "读取并编码第 " + (frameIndex + 1) + " 张…",
+          frameIndex + " / " + items.length + " 张"
+        );
+
+        var image = await loadImageElement(frameItem.url, 20000);
+        throwIfCancelled();
+
+        drawImageFitted(context, image, params.width, params.height, params.fit, params.background);
+
+        var imageData = context.getImageData(0, 0, params.width, params.height);
+        var indices = quantizer.quantize(imageData, params.dither);
+        encoder.addFrame(indices, params.delayCs);
+
+        setProgress(
+          10 + ((frameIndex + 1) / items.length) * 87,
+          "读取并编码第 " + (frameIndex + 1) + " 张…",
+          (frameIndex + 1) + " / " + items.length + " 张"
+        );
+
+        await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
+      }
+
+      throwIfCancelled();
+      setProgress(98, "封装 GIF 文件…", items.length + " / " + items.length + " 张");
+      await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
+
+      var bytes = encoder.finish();
+      var blob = new Blob([bytes], { type: "image/gif" });
+
+      setProgress(100, "完成", items.length + " / " + items.length + " 张");
+      showResult(blob, params);
+      el.generateLabel.textContent = "重新生成 GIF";
+      showToast("GIF 已生成，可预览或下载。");
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        showToast("已取消生成。");
+      } else {
+        var message = (error && error.message) ? error.message : "未知错误";
+        if (/memory|allocation|array buffer/i.test(message)) {
+          message = "浏览器内存不足，请减少图片数量、尺寸或颜色数量。";
+        }
+        setSettingsError("生成失败：" + message);
+        showToast("生成失败，请检查图片或降低输出参数。", "error");
+        console.error(error);
+      }
+    } finally {
+      if (state.busy) endBusyUi();
+    }
+  }
+
+  async function generateGif() {
+    if (state.busy || state.loading) return;
+    if (isImageMode()) {
+      await generateImageGif();
+      return;
+    }
+    if (!state.loaded) return;
+
+    var plan = getFramePlan();
+    if (plan.overLimit) {
+      showToast("片段超过 " + MAX_FRAMES + " 帧，请缩短选区或降低帧率。", "error");
+      return;
+    }
+
+    var params = {
+      start: state.trimStart,
+      end: state.trimEnd,
+      fps: state.fps,
+      width: state.width,
+      height: state.height,
+      colors: state.colors,
+      dither: state.dither,
+      loop: state.loop,
+      frameCount: plan.frameCount
+    };
+
+    beginBusyUi();
+    el.framesProgress.textContent = "0 / " + params.frameCount + " 帧";
+
+    try {
+      setProgress(1, "加载视频解码器…", "0 / " + params.frameCount + " 帧");
+      await prepareVideo(captureVideo, state.url, 20000);
+      throwIfCancelled();
+
+      var sampleCount = Math.min(10, Math.max(4, Math.ceil(params.frameCount / 12)));
+      var palette = await collectPalette(params, plan, sampleCount);
+      throwIfCancelled();
+
+      var quantizer = Core.createQuantizer(palette);
+      var encoder = Core.createGifEncoder(params.width, params.height, quantizer.palette, {
+        loop: params.loop
+      });
+      var delays = buildDelays(params.frameCount, params.fps);
+
+      var canvas = document.createElement("canvas");
+      canvas.width = params.width;
+      canvas.height = params.height;
+      var context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+      if (!context) throw new Error("当前浏览器无法创建画布。");
+
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+
+      for (var i = 0; i < params.frameCount; i++) {
+        throwIfCancelled();
+
+        var time = params.start + i / params.fps;
+        var percent = 10 + (i / params.frameCount) * 87;
+
+        setProgress(
+          percent,
+          "截取并编码第 " + (i + 1) + " 帧…",
+          i + " / " + params.frameCount + " 帧"
+        );
+
+        await seekVideoElement(captureVideo, time, 12000);
+        throwIfCancelled();
+
+        context.fillStyle = "#000";
+        context.fillRect(0, 0, params.width, params.height);
+        context.drawImage(captureVideo, 0, 0, params.width, params.height);
+
+        var imageData = context.getImageData(0, 0, params.width, params.height);
+        var indices = quantizer.quantize(imageData, params.dither);
+        encoder.addFrame(indices, delays[i]);
+
+        setProgress(
+          10 + ((i + 1) / params.frameCount) * 87,
+          "截取并编码第 " + (i + 1) + " 帧…",
+          (i + 1) + " / " + params.frameCount + " 帧"
+        );
+
+        if ((i & 1) === 0) {
+          await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
+        }
+      }
+
+      throwIfCancelled();
+      setProgress(98, "封装 GIF 文件…", params.frameCount + " / " + params.frameCount + " 帧");
+      await new Promise(function (resolve) { window.setTimeout(resolve, 0); });
+
+      var bytes = encoder.finish();
+      var blob = new Blob([bytes], { type: "image/gif" });
+
+      setProgress(100, "完成", params.frameCount + " / " + params.frameCount + " 帧");
+      showResult(blob, params);
+      el.generateLabel.textContent = "重新生成 GIF";
+      showToast("GIF 已生成，可预览或下载。");
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        showToast("已取消生成。");
+      } else {
+        var message = (error && error.message) ? error.message : "未知错误";
+        if (/memory|allocation|array buffer/i.test(message)) {
+          message = "浏览器内存不足，请降低尺寸、颜色数量或帧数。";
+        }
+        setSettingsError("生成失败：" + message);
+        showToast("生成失败，请检查视频或降低输出参数。", "error");
+        console.error(error);
+      }
+    } finally {
+      if (state.busy) endBusyUi();
+    }
+  }
+
+  function makeGifFilename(params) {
+    var base = "";
+    if (params.mode === "images") {
+      base = state.images.length && state.images[0].name
+        ? safeFilenameBase(state.images[0].name) + "-sequence"
+        : "image-sequence";
+    } else {
+      base = state.file && state.file.name
+        ? safeFilenameBase(state.file.name)
+        : "framegrab";
+    }
+    return base + "-gif-" + params.width + "x" + params.height + ".gif";
+  }
+
+  function showResult(blob, params) {
+    if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
+
+    state.resultUrl = URL.createObjectURL(blob);
+    el.gifPreview.src = state.resultUrl;
+    var filename = makeGifFilename(params);
+    el.resultSource.textContent = params.mode === "images" ? "IMAGE SERIES" : "VIDEO";
+    el.resultDimensions.textContent = params.width + " × " + params.height;
+    el.resultFrames.textContent = params.mode === "images"
+      ? params.frameCount + " 帧"
+      : params.frameCount + " · " + params.fps + "fps";
+    el.resultFilesize.textContent = formatBytes(blob.size);
+    el.resultLoops.textContent = params.loop ? "LOOP" : "ONCE";
+    el.resultFilename.textContent = filename;
+    el.downloadBtn.href = state.resultUrl;
+    el.downloadBtn.download = filename;
+    el.resultCard.hidden = false;
+
+    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.setTimeout(function () {
+      el.resultCard.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start"
+      });
+    }, 120);
+  }
+
+  function handleTimelinePointerDown(event) {
+    if (!state.loaded || state.busy || state.loading) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    var handle = event.target.closest ? event.target.closest(".trim-handle") : null;
+    event.preventDefault();
+
+    timelineDrag = {
+      pointerId: event.pointerId,
+      handle: handle
+    };
+
+    try {
+      el.timeline.setPointerCapture(event.pointerId);
+    } catch (error) { /* ignore */ }
+
+    if (handle) {
+      handle.classList.add("is-dragging");
+      try { handle.focus({ preventScroll: true }); } catch (error) { handle.focus(); }
+      setTrimBoundary(handle.dataset.handle, timeFromPointer(event), true);
+    } else {
+      el.previewVideo.pause();
+      seekPreview(timeFromPointer(event));
+    }
+  }
+
+  function handleTimelinePointerMove(event) {
+    if (!timelineDrag || event.pointerId !== timelineDrag.pointerId) return;
+    event.preventDefault();
+
+    var time = timeFromPointer(event);
+    if (timelineDrag.handle) {
+      setTrimBoundary(timelineDrag.handle.dataset.handle, time, true);
+    } else {
+      seekPreview(time);
+    }
+  }
+
+  function handleTimelinePointerUp(event) {
+    if (!timelineDrag || event.pointerId !== timelineDrag.pointerId) return;
+    endTimelineDrag();
+  }
+
+  function handleTrimKeydown(event) {
+    if (!state.loaded || state.busy || state.loading) return;
+
+    var handle = event.currentTarget;
+    var boundary = handle.dataset.handle;
+    var current = boundary === "start" ? state.trimStart : state.trimEnd;
+    var step = event.shiftKey ? 1 : 0.1;
+    var next = current;
+    var key = event.key;
+    var handled = true;
+
+    if (key === "ArrowLeft" || key === "ArrowDown") next = current - step;
+    else if (key === "ArrowRight" || key === "ArrowUp") next = current + step;
+    else if (key === "PageDown") next = current - 5;
+    else if (key === "PageUp") next = current + 5;
+    else if (key === "Home") next = 0;
+    else if (key === "End") next = state.duration;
+    else handled = false;
+
+    if (!handled) return;
+    event.preventDefault();
+
+    // Keep Home/End meaningful for the end handle: it cannot cross the start handle.
+    setTrimBoundary(boundary, next, true);
+  }
+
+  function setBoundaryFromPlayhead(boundary) {
+    if (!state.loaded || state.busy || state.loading) return;
+    var time = clamp(el.previewVideo.currentTime, 0, state.duration);
+    var gap = minimumTrimGap();
+
+    if (boundary === "start") {
+      if (time > state.trimEnd - gap) {
+        showToast("当前位置晚于片段结束点，请先调整结束时间。", "error");
+        return;
+      }
+      state.trimStart = time;
+    } else {
+      if (time < state.trimStart + gap) {
+        showToast("当前位置早于片段开始点，请先调整开始时间。", "error");
+        return;
+      }
+      state.trimEnd = time;
+    }
+
+    updateSelectionUi();
+    updatePlayhead();
+  }
+
+  function openImagePicker() {
+    if (state.busy || state.loading) return;
+    el.imageInput.click();
+  }
+
+  function clearImageDragUi() {
+    var marked = el.imageList.querySelectorAll(".is-drop-target, .is-dragging");
+    for (var i = 0; i < marked.length; i++) {
+      marked[i].classList.remove("is-drop-target", "is-dragging");
+    }
+    imageDragId = null;
+  }
+
+  function reorderImageById(draggedId, targetId, placeAfter) {
+    if (state.busy || state.loading || draggedId === targetId) return;
+
+    var fromIndex = -1;
+    var targetItem = null;
+    for (var i = 0; i < state.images.length; i++) {
+      if (state.images[i].id === draggedId) fromIndex = i;
+      if (state.images[i].id === targetId) targetItem = state.images[i];
+    }
+    if (fromIndex < 0) return;
+
+    stopImagePreview();
+    var dragged = state.images.splice(fromIndex, 1)[0];
+    var insertIndex;
+
+    if (targetItem) {
+      var targetIndex = state.images.indexOf(targetItem);
+      insertIndex = targetIndex + (placeAfter ? 1 : 0);
+    } else {
+      insertIndex = state.images.length;
+    }
+
+    state.images.splice(insertIndex, 0, dragged);
+    refreshImageEditorState();
+  }
+
+  function bindEvents() {
+    el.fileInput.addEventListener("change", function () {
+      var file = el.fileInput.files && el.fileInput.files[0];
+      el.fileInput.value = "";
+      if (file) openFile(file);
+    });
+
+    el.imageInput.addEventListener("change", function () {
+      var files = el.imageInput.files
+        ? Array.prototype.slice.call(el.imageInput.files)
+        : [];
+      el.imageInput.value = "";
+      if (files.length) importImages(files);
+    });
+
+    el.modeSwitch.addEventListener("click", function (event) {
+      var button = event.target.closest ? event.target.closest(".mode-tab") : null;
+      if (!button) return;
+      setMode(button.dataset.mode);
+    });
+
+    el.dropzone.addEventListener("click", function () {
+      if (state.loading || state.busy) return;
+      if (isImageMode()) openImagePicker();
+      else el.fileInput.click();
+    });
+
+    el.dropzone.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      if (state.loading || state.busy) return;
+      if (isImageMode()) openImagePicker();
+      else el.fileInput.click();
+    });
+
+    el.replaceBtn.addEventListener("click", function () {
+      if (state.loading || state.busy) return;
+      if (isImageMode()) openImagePicker();
+      else el.fileInput.click();
+    });
+
+    el.dropzone.addEventListener("dragenter", function (event) {
+      if (state.loading || state.busy) return;
+      event.preventDefault();
+      dragDepth++;
+      el.dropzone.classList.add("is-dragover");
+    });
+
+    el.dropzone.addEventListener("dragover", function (event) {
+      if (state.loading || state.busy) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    });
+
+    el.dropzone.addEventListener("dragleave", function () {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) el.dropzone.classList.remove("is-dragover");
+    });
+
+    el.dropzone.addEventListener("drop", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      dragDepth = 0;
+      el.dropzone.classList.remove("is-dragover");
+      if (state.loading || state.busy) return;
+
+      var files = event.dataTransfer ? Array.prototype.slice.call(event.dataTransfer.files) : [];
+      if (!files.length) {
+        showDropError("没有检测到文件，请重新拖入。");
+        return;
+      }
+
+      if (isImageMode()) {
+        var imageFiles = files.filter(looksLikeImage);
+        if (!imageFiles.length) {
+          showDropError("没有检测到可用图片，请选择 JPG、PNG、WebP、AVIF 或 BMP。");
+          return;
+        }
+        importImages(imageFiles);
+        return;
+      }
+
+      var file = files.find(looksLikeVideo) || files[0];
+      if (!file) {
+        showDropError("没有检测到视频文件，请重新拖入。");
+        return;
+      }
+      openFile(file);
+    });
+
+    window.addEventListener("dragover", function (event) {
+      if (event.dataTransfer && Array.prototype.indexOf.call(event.dataTransfer.types, "Files") !== -1) {
+        event.preventDefault();
+      }
+    });
+
+    window.addEventListener("drop", function (event) {
+      if (event.dataTransfer && Array.prototype.indexOf.call(event.dataTransfer.types, "Files") !== -1) {
+        event.preventDefault();
+      }
+    });
+
+    el.previewVideo.addEventListener("timeupdate", updatePlayhead);
+    el.previewVideo.addEventListener("seeked", updatePlayhead);
+    el.previewVideo.addEventListener("seeking", updatePlayhead);
+    el.previewVideo.addEventListener("play", startPlayheadLoop);
+    el.previewVideo.addEventListener("pause", function () {
+      cancelAnimationFrame(playheadRaf);
+      updatePlayhead();
+    });
+    el.previewVideo.addEventListener("ended", updatePlayhead);
+
+    el.fpsGroup.addEventListener("click", function (event) {
+      var button = event.target.closest ? event.target.closest("button[data-fps]") : null;
+      if (!button) return;
+      state.fps = Number(button.dataset.fps);
+      updateFpsButtons();
+      setSettingsError("");
+      updateSummary();
+    });
+
+    el.colorGroup.addEventListener("click", function (event) {
+      var button = event.target.closest ? event.target.closest("button[data-colors]") : null;
+      if (!button) return;
+      state.colors = Number(button.dataset.colors);
+      updateColorButtons();
+      setSettingsError("");
+      updateSummary();
+    });
+
+    el.widthRange.addEventListener("input", function () {
+      state.width = Number(el.widthRange.value);
+      syncActiveWidthPref();
+      updateWidthUi();
+      setSettingsError("");
+      updateSummary();
+    });
+
+    el.ditherToggle.addEventListener("change", function () {
+      state.dither = el.ditherToggle.checked;
+      setSettingsError("");
+    });
+
+    el.loopToggle.addEventListener("change", function () {
+      state.loop = el.loopToggle.checked;
+      setSettingsError("");
+    });
+
+    el.imageDurationRange.addEventListener("input", function () {
+      state.imageDuration = clamp(Number(el.imageDurationRange.value) / 100, 0.1, 5);
+      stopImagePreview();
+      updateImageTimingUi();
+      setSettingsError("");
+      updateSummary();
+    });
+
+    el.imageFitGroup.addEventListener("click", function (event) {
+      var button = event.target.closest ? event.target.closest("button[data-fit]") : null;
+      if (!button) return;
+      state.imageFit = button.dataset.fit === "cover" ? "cover" : "contain";
+      stopImagePreview();
+      updateFitButtons();
+      if (state.images.length) updateImagePreview();
+      setSettingsError("");
+    });
+
+    el.imageBackgroundInput.addEventListener("input", function () {
+      state.imageBackground = el.imageBackgroundInput.value || "#11130f";
+      stopImagePreview();
+      updateFitButtons();
+      if (state.images.length) updateImagePreview();
+    });
+
+    el.imagePlayBtn.addEventListener("click", toggleImagePreview);
+    el.clearImagesBtn.addEventListener("click", clearImages);
+
+    el.imageList.addEventListener("click", function (event) {
+      if (state.busy || state.loading) return;
+
+      var addButton = event.target.closest ? event.target.closest("[data-image-add]") : null;
+      if (addButton) {
+        openImagePicker();
+        return;
+      }
+
+      var card = event.target.closest ? event.target.closest(".image-card") : null;
+      if (!card) return;
+
+      var actionButton = event.target.closest("[data-image-action]");
+      if (actionButton) {
+        event.preventDefault();
+        if (actionButton.dataset.imageAction === "remove") removeImage(card.dataset.id);
+        else if (actionButton.dataset.imageAction === "left") moveImage(card.dataset.id, -1);
+        else if (actionButton.dataset.imageAction === "right") moveImage(card.dataset.id, 1);
+        return;
+      }
+
+      var selectButton = event.target.closest(".image-select");
+      if (selectButton) {
+        event.preventDefault();
+        selectImage(card.dataset.id);
+      }
+    });
+
+    el.imageList.addEventListener("dragstart", function (event) {
+      if (state.busy || state.loading) {
+        event.preventDefault();
+        return;
+      }
+      var card = event.target.closest ? event.target.closest(".image-card") : null;
+      if (!card) {
+        event.preventDefault();
+        return;
+      }
+
+      imageDragId = card.dataset.id;
+      card.classList.add("is-dragging");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        try { event.dataTransfer.setData("text/plain", imageDragId); } catch (error) { /* ignore */ }
+      }
+    });
+
+    el.imageList.addEventListener("dragover", function (event) {
+      if (!imageDragId || state.busy || state.loading) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+
+      var targets = el.imageList.querySelectorAll(".is-drop-target");
+      for (var i = 0; i < targets.length; i++) targets[i].classList.remove("is-drop-target");
+
+      var card = event.target.closest ? event.target.closest(".image-card") : null;
+      if (card && card.dataset.id !== imageDragId) card.classList.add("is-drop-target");
+    });
+
+    el.imageList.addEventListener("dragleave", function (event) {
+      var card = event.target.closest ? event.target.closest(".image-card") : null;
+      if (card) card.classList.remove("is-drop-target");
+    });
+
+    el.imageList.addEventListener("drop", function (event) {
+      if (!imageDragId || state.busy || state.loading) return;
+      event.preventDefault();
+
+      var card = event.target.closest ? event.target.closest(".image-card") : null;
+      var draggedId = imageDragId;
+      var placeAfter = false;
+
+      if (card) {
+        var rect = card.getBoundingClientRect();
+        placeAfter = event.clientX > rect.left + rect.width / 2;
+      }
+
+      var droppingOnAdd = event.target.closest ? event.target.closest("[data-image-add]") : null;
+
+      clearImageDragUi();
+      if (card) reorderImageById(draggedId, card.dataset.id, placeAfter);
+      else if (droppingOnAdd) reorderImageById(draggedId, null, true);
+    });
+
+    el.imageList.addEventListener("dragend", clearImageDragUi);
+
+    el.timeline.addEventListener("pointerdown", handleTimelinePointerDown);
+    el.timeline.addEventListener("pointermove", handleTimelinePointerMove);
+    el.timeline.addEventListener("pointerup", handleTimelinePointerUp);
+    el.timeline.addEventListener("pointercancel", handleTimelinePointerUp);
+    el.timeline.addEventListener("lostpointercapture", endTimelineDrag);
+
+    el.startHandle.addEventListener("keydown", handleTrimKeydown);
+    el.endHandle.addEventListener("keydown", handleTrimKeydown);
+
+    var boundaryButtons = document.querySelectorAll("[data-set-bound]");
+    for (var i = 0; i < boundaryButtons.length; i++) {
+      boundaryButtons[i].addEventListener("click", function (event) {
+        setBoundaryFromPlayhead(event.currentTarget.dataset.setBound);
+      });
+    }
+
+    el.generateBtn.addEventListener("click", generateGif);
+
+    el.cancelBtn.addEventListener("click", function () {
+      if (!state.busy) return;
+      state.cancelRequested = true;
+      el.cancelBtn.disabled = true;
+      el.cancelBtn.textContent = "取消中…";
+      el.progressStage.textContent = "正在停止…";
+    });
+
+    el.adjustBtn.addEventListener("click", function () {
+      var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el.settingsCard.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "center"
+      });
+      window.setTimeout(function () {
+        try { el.generateBtn.focus({ preventScroll: true }); } catch (error) { el.generateBtn.focus(); }
+      }, reduceMotion ? 0 : 380);
+    });
+  }
+
+  function initialize() {
+    bindEvents();
+    updateModeControls();
+    updateSourceModeUi();
+    updateSettingsModeUi();
+    updateFpsButtons();
+    updateColorButtons();
+    updateWidthUi();
+    updateImageTimingUi();
+    updateFitButtons();
+    updateImagePreview();
+    updateImagePlayButton();
+    updateSummary();
+    setProgress(0, "准备中…", "—");
+
+    if (typeof ResizeObserver !== "undefined") {
+      var imageStageObserver = new ResizeObserver(function () {
+        if (isImageMode() && state.images.length) fitImagePreviewFrame();
+      });
+      imageStageObserver.observe(el.imageStage);
+    } else {
+      window.addEventListener("resize", function () {
+        if (isImageMode() && state.images.length) fitImagePreviewFrame();
+      });
+    }
+  }
+
+  initialize();
+})();
+/* APP END */
+  </script>
+</body>
+</html>
